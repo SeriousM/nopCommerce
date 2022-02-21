@@ -1,0 +1,9 @@
+﻿@{
+    Layout = ""; 
+}
+<link rel="stylesheet" href="~/Plugins/ExternalAuth.OAuth/Content/oauthstyles.css" />
+<div class="oauth-login-block">
+    <div class="buttons">
+        <a asp-controller="OAuthAuthentication" asp-action="login" asp-route-returnurl="@Context.Request.Query["ReturnUrl"]" class="oauth-btn"></a>
+    </div>
+</div>

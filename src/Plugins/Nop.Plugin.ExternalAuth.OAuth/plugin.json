@@ -1,0 +1,11 @@
+﻿{
+  "Group": "ExternalAuth methods",
+  "FriendlyName": "OAuth authentication",
+  "SystemName": "ExternalAuth.OAuth",
+  "Version": "1.73",
+  "SupportedVersions": [ "4.50" ],
+  "Author": "nopCommerce team",
+  "DisplayOrder": 5,
+  "FileName": "Nop.Plugin.ExternalAuth.OAuth.dll",
+  "Description": "This plugin enables OAuth authentication (login using any OAuth provider)"
+}
