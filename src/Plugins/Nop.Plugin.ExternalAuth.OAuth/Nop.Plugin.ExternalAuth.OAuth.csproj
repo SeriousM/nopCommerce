@@ -57,7 +57,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.Authentication.Facebook" Version="6.0.1" />
+    <!--
+    Note: We use 6.0.0-preview.3.21201.13 because it has the minimum version dependency to Microsoft.IdentityModel.Protocols.OpenIdConnect@6.8.0
+    as the Facebook plugin. If we would use 6.0.1 the dependency version would change to Microsoft.IdentityModel.Protocols.OpenIdConnect@6.10.0
+    which is NOT part of Nop.Web and thus the startup will fail.
+    On update make sure to have the same depencency to Microsoft.IdentityModel.Protocols.OpenIdConnect as Microsoft.AspNetCore.Authentication.Facebook.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="6.0.0-preview.3.21201.13" />
+    <!--<PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="6.8.0" />-->
   </ItemGroup>
 
   <!-- This target execute after "Build" target -->
