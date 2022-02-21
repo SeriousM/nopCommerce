@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Facebook;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.DependencyInjection;
 using Nop.Core.Infrastructure;
@@ -19,18 +19,18 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
         /// <param name="builder">Authentication builder</param>
         public void Configure(AuthenticationBuilder builder)
         {
-            builder.AddFacebook(FacebookDefaults.AuthenticationScheme, options =>
+            builder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
                 //set credentials
                 var settings = EngineContext.Current.Resolve<OAuthExternalAuthSettings>();
-                options.AppId = settings.ClientKeyIdentifier;
-                options.AppSecret = settings.ClientSecret;
+                options.ClientId = settings.ClientKeyIdentifier;
+                options.ClientSecret = settings.ClientSecret;
 
                 //store access and refresh tokens for the further usage
                 options.SaveTokens = true;
 
                 //set custom events handlers
-                options.Events = new OAuthEvents
+                options.Events = new OpenIdConnectEvents
                 {
                     //in case of error, redirect the user to the specified URL
                     OnRemoteFailure = context =>

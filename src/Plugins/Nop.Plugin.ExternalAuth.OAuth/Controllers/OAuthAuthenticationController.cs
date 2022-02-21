@@ -2,7 +2,7 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Facebook;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Nop.Core;
@@ -28,7 +28,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         private readonly IExternalAuthenticationService _externalAuthenticationService;
         private readonly ILocalizationService _localizationService;
         private readonly INotificationService _notificationService;
-        private readonly IOptionsMonitorCache<FacebookOptions> _optionsCache;
+        private readonly IOptionsMonitorCache<OpenIdConnectOptions> _optionsCache;
         private readonly IPermissionService _permissionService;
         private readonly ISettingService _settingService;
         private readonly IStoreContext _storeContext;
@@ -43,7 +43,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             IExternalAuthenticationService externalAuthenticationService,
             ILocalizationService localizationService,
             INotificationService notificationService,
-            IOptionsMonitorCache<FacebookOptions> optionsCache,
+            IOptionsMonitorCache<OpenIdConnectOptions> optionsCache,
             IPermissionService permissionService,
             ISettingService settingService,
             IStoreContext storeContext,
@@ -98,7 +98,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             await _settingService.SaveSettingAsync(oAuthExternalAuthSettings);
 
             //clear Facebook authentication options cache
-            _optionsCache.TryRemove(FacebookDefaults.AuthenticationScheme);
+            _optionsCache.TryRemove(OpenIdConnectDefaults.AuthenticationScheme);
 
             _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
@@ -126,13 +126,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             };
             authenticationProperties.SetString(OAuthAuthenticationDefaults.ErrorCallback, Url.RouteUrl("Login", new { returnUrl }));
 
-            return Challenge(authenticationProperties, FacebookDefaults.AuthenticationScheme);
+            return Challenge(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         public async Task<IActionResult> LoginCallback(string returnUrl)
         {
             //authenticate Facebook user
-            var authenticateResult = await HttpContext.AuthenticateAsync(FacebookDefaults.AuthenticationScheme);
+            var authenticateResult = await HttpContext.AuthenticateAsync(OpenIdConnectDefaults.AuthenticationScheme);
             if (!authenticateResult.Succeeded || !authenticateResult.Principal.Claims.Any())
                 return RedirectToRoute("Login");
 
@@ -140,7 +140,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var authenticationParameters = new ExternalAuthenticationParameters
             {
                 ProviderSystemName = OAuthAuthenticationDefaults.SystemName,
-                AccessToken = await HttpContext.GetTokenAsync(FacebookDefaults.AuthenticationScheme, "access_token"),
+                AccessToken = await HttpContext.GetTokenAsync(OpenIdConnectDefaults.AuthenticationScheme, "access_token"),
                 Email = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Email)?.Value,
                 ExternalIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value,
                 ExternalDisplayIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Name)?.Value,
