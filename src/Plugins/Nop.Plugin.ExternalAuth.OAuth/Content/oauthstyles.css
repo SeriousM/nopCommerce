@@ -1,7 +1,9 @@
 ﻿.oauth-btn {
   display: inline-block;
   width: 150px;
-  height: 23px;
+  height: 42px;
   background-image: url('images/oauth_logo.png');
   background-repeat: no-repeat;
+  background-size: cover;
+  border: 1px solid lightgray;
 }
