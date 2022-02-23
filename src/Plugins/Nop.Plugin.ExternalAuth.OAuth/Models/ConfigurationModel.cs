@@ -8,10 +8,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Models
     /// </summary>
     public record ConfigurationModel : BaseNopModel
     {
+        [NopResourceDisplayName("Plugins.ExternalAuth.OAuth.AuthorityUrl")]
+        public string AuthorityUrl { get; set; }
+
         [NopResourceDisplayName("Plugins.ExternalAuth.OAuth.ClientKeyIdentifier")]
         public string ClientId { get; set; }
 
-        [NopResourceDisplayName("Plugins.ExternalAuth.OAuth.ClientSecret")]
-        public string ClientSecret { get; set; }
+        [NopResourceDisplayName("Plugins.ExternalAuth.OAuth.AdditionalScopes")]
+        public string AdditionalScopes { get; set; }
     }
 }

@@ -1,7 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.Authentication.OAuth;
 using Microsoft.Extensions.DependencyInjection;
 using Nop.Core.Infrastructure;
 using Nop.Services.Authentication.External;
@@ -23,12 +24,34 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
             {
                 //set credentials
                 var settings = EngineContext.Current.Resolve<OAuthExternalAuthSettings>();
+                options.Authority = settings.AuthorityUrl;
                 options.ClientId = settings.ClientKeyIdentifier;
-                options.ClientSecret = settings.ClientSecret;
+                
+                // default scopes set: openid, profile
+                if (settings.AdditionalScopes is not null)
+                {
+                    var scopesToWrite = settings.AdditionalScopes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
+                    foreach (var scope in scopesToWrite)
+                    {
+                        options.Scope.Add(scope);
+                    }
+                }
+                
+                // force using the userinfo endpoint after creating the identity (first time only).
+                //options.GetClaimsFromUserInfoEndpoint
 
+                // force https required. only during dev!
+                options.RequireHttpsMetadata = false;
+
+                // "metadata" address..?
+                //options.MetadataAddress
+
+                // set to "id_token" (OpenIdConnectResponseType.IdToken)
+                //options.ResponseType
+                
                 //store access and refresh tokens for the further usage
                 options.SaveTokens = true;
-
+                
                 //set custom events handlers
                 options.Events = new OpenIdConnectEvents
                 {
@@ -41,7 +64,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
                         context.Response.Redirect(errorUrl);
 
                         return Task.FromResult(0);
-                    }
+                    },
+                    // TODO: validate issuer and also token itself with introspection!
                 };
             });
         }

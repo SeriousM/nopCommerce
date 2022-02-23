@@ -8,13 +8,18 @@ namespace Nop.Plugin.ExternalAuth.OAuth
     public class OAuthExternalAuthSettings : ISettings
     {
         /// <summary>
+        /// Gets or sets OAuth2 authority (server)
+        /// </summary>
+        public string AuthorityUrl { get; set; }
+
+        /// <summary>
         /// Gets or sets OAuth2 client identifier
         /// </summary>
         public string ClientKeyIdentifier { get; set; }
 
         /// <summary>
-        /// Gets or sets OAuth2 client secret
+        /// Gets or sets additional OAuth2 scopes (space separated)
         /// </summary>
-        public string ClientSecret { get; set; }
+        public string AdditionalScopes { get; set; }
     }
 }

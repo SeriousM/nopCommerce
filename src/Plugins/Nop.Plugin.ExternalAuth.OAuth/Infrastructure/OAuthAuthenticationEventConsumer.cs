@@ -1,6 +1,9 @@
 ﻿using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 using Nop.Core.Domain.Customers;
 using Nop.Services.Authentication.External;
 using Nop.Services.Common;
@@ -11,19 +14,28 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
     /// <summary>
     /// Facebook authentication event consumer (used for saving customer fields on registration)
     /// </summary>
-    public partial class OAuthAuthenticationEventConsumer : IConsumer<CustomerAutoRegisteredByExternalMethodEvent>
+    public partial class OAuthAuthenticationEventConsumer 
+      : IConsumer<CustomerAutoRegisteredByExternalMethodEvent>, 
+        IConsumer<CustomerLoggedOutEvent>
     {
         #region Fields
 
         private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IOptionsSnapshot<OpenIdConnectOptions> _openIdConnectOptions;
 
         #endregion
 
         #region Ctor
 
-        public OAuthAuthenticationEventConsumer(IGenericAttributeService genericAttributeService)
+        public OAuthAuthenticationEventConsumer(
+          IGenericAttributeService genericAttributeService,
+          IHttpContextAccessor httpContextAccessor,
+          IOptionsSnapshot<OpenIdConnectOptions> openIdConnectOptions)
         {
-            _genericAttributeService = genericAttributeService;
+          _genericAttributeService = genericAttributeService;
+          _httpContextAccessor = httpContextAccessor;
+          _openIdConnectOptions = openIdConnectOptions;
         }
 
         #endregion
@@ -52,6 +64,15 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
             var lastName = eventMessage.AuthenticationParameters.Claims?.FirstOrDefault(claim => claim.Type == ClaimTypes.Surname)?.Value;
             if (!string.IsNullOrEmpty(lastName))
                 await _genericAttributeService.SaveAttributeAsync(eventMessage.Customer, NopCustomerDefaults.LastNameAttribute, lastName);
+        }
+
+        public async Task HandleEventAsync(CustomerLoggedOutEvent eventMessage)
+        {
+            if (eventMessage?.Customer == null)
+                return;
+
+            ////var openIdConnectOptions = options.Get(OpenIdConnectDefaults.AuthenticationScheme);
+            ////var configuration = await openIdConnectOptions.ConfigurationManager.GetConfigurationAsync(CancellationToken.None);
         }
 
         #endregion

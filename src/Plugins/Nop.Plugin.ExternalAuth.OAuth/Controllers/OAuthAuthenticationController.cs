@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
@@ -74,8 +75,9 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
             var model = new ConfigurationModel
             {
+                AuthorityUrl = oAuthExternalAuthSettings.AuthorityUrl,
                 ClientId = oAuthExternalAuthSettings.ClientKeyIdentifier,
-                ClientSecret = oAuthExternalAuthSettings.ClientSecret
+                AdditionalScopes = oAuthExternalAuthSettings.AdditionalScopes
             };
 
             return View("~/Plugins/ExternalAuth.OAuth/Views/Configure.cshtml", model);
@@ -93,16 +95,29 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 return await Configure();
 
             //save settings
+            oAuthExternalAuthSettings.AuthorityUrl = model.AuthorityUrl;
             oAuthExternalAuthSettings.ClientKeyIdentifier = model.ClientId;
-            oAuthExternalAuthSettings.ClientSecret = model.ClientSecret;
+            oAuthExternalAuthSettings.AdditionalScopes = ParseScopes(model.AdditionalScopes);
             await _settingService.SaveSettingAsync(oAuthExternalAuthSettings);
 
-            //clear Facebook authentication options cache
+            //clear OAuth authentication options cache
             _optionsCache.TryRemove(OpenIdConnectDefaults.AuthenticationScheme);
 
             _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
 
             return await Configure();
+        }
+
+        private static string ParseScopes(string scopes)
+        {
+            if (scopes is null or "")
+            {
+                return null;
+            }
+
+            scopes = string.Join(' ', scopes.Split(' ', StringSplitOptions.RemoveEmptyEntries).Distinct());
+
+            return scopes;
         }
 
         public async Task<IActionResult> Login(string returnUrl)
@@ -111,12 +126,14 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var methodIsAvailable = await _authenticationPluginManager
                 .IsPluginActiveAsync(OAuthAuthenticationDefaults.SystemName, await _workContext.GetCurrentCustomerAsync(), store.Id);
             if (!methodIsAvailable)
-                throw new NopException("Facebook authentication module cannot be loaded");
+                throw new NopException("OAuth authentication module cannot be loaded");
 
-            if (string.IsNullOrEmpty(oAuthExternalAuthSettings.ClientKeyIdentifier) ||
-                string.IsNullOrEmpty(oAuthExternalAuthSettings.ClientSecret))
+            // note: scopes and secret may be empty.
+
+            if (string.IsNullOrEmpty(oAuthExternalAuthSettings.AuthorityUrl) ||
+                string.IsNullOrEmpty(oAuthExternalAuthSettings.ClientKeyIdentifier))
             {
-                throw new NopException("Facebook authentication module not configured");
+                throw new NopException("OAuth authentication module not configured");
             }
 
             //configure login callback action
@@ -131,7 +148,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
         public async Task<IActionResult> LoginCallback(string returnUrl)
         {
-            //authenticate Facebook user
+            //authenticate OAuth user
             var authenticateResult = await HttpContext.AuthenticateAsync(OpenIdConnectDefaults.AuthenticationScheme);
             if (!authenticateResult.Succeeded || !authenticateResult.Principal.Claims.Any())
                 return RedirectToRoute("Login");
@@ -140,7 +157,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var authenticationParameters = new ExternalAuthenticationParameters
             {
                 ProviderSystemName = OAuthAuthenticationDefaults.SystemName,
-                AccessToken = await HttpContext.GetTokenAsync(OpenIdConnectDefaults.AuthenticationScheme, "access_token"),
+                AccessToken = await HttpContext.GetTokenAsync(OpenIdConnectDefaults.AuthenticationScheme, "id_token"),
                 Email = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Email)?.Value,
                 ExternalIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value,
                 ExternalDisplayIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Name)?.Value,
