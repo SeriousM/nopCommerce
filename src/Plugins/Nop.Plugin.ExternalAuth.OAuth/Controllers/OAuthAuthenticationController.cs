@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
@@ -195,31 +196,6 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             await SynchronizeEventRolesFromClaimsAsync(claimsPrincipal,  customer);
         }
 
-        private async Task SynchronizeEventRolesFromClaimsAsync(ClaimsPrincipal claimsPrincipal, Customer customer)
-        {
-            var eventExhibitorIds = claimsPrincipal.FindAll(claim => claim.Type == "event.exhibitor")
-                                                   .Select(claim => claim.Value).ToArray();
-
-            await _genericAttributeService.SaveAttributeAsync(customer, "Exhibitors", string.Join(';', eventExhibitorIds));
-
-            //var nonSystemRoles = thisCustomerRoles.Where(r => !r.IsSystemRole);
-            //foreach (var roleToRemove in nonSystemRoles)
-            //{
-            //    await _customerService.RemoveCustomerRoleMappingAsync(customer, roleToRemove);
-            //}
-
-            //var allCustomerRoles = await _customerService.GetAllCustomerRolesAsync();
-
-            //var availableRoles = allCustomerRoles.Join(eventIds, cr => cr.Name, e => e, (role, _) => role);
-            //foreach (var role in availableRoles)
-            //{
-            //    await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
-            //    {
-            //        CustomerId = customer.Id, CustomerRoleId = role.Id
-            //    });
-            //}
-        }
-
         private async Task SynchronizeAdminRoleFromClaimsAsync(ClaimsPrincipal claimsPrincipal, IEnumerable<CustomerRole> thisCustomerRoles, Customer customer)
         {
             var adminRole = await _customerService.GetCustomerRoleByIdAsync(1);
@@ -243,6 +219,31 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                     });
                 }
             }
+        }
+
+        private async Task SynchronizeEventRolesFromClaimsAsync(ClaimsPrincipal claimsPrincipal, Customer customer)
+        {
+            var eventExhibitorIds = claimsPrincipal.FindAll(claim => claim.Type == "event.exhibitor")
+                                                   .Select(claim => claim.Value);
+
+            var exhibitors = eventExhibitorIds
+                            .Select(ee => ee.Split('.'))
+                            .Select(ee =>
+                             {
+                                 var eventId = ee[0];
+                                 var exhibitorId = ee[1];
+
+                                 return new ExhibitorModel
+                                 {
+                                     Event = eventId,
+                                     Exhibitor = "Exhibitor: " + exhibitorId,
+                                     ExhibitorId = exhibitorId
+                                 };
+                             });
+
+            var exhibitorsString = JsonSerializer.Serialize(exhibitors);
+
+            await _genericAttributeService.SaveAttributeAsync(customer, "Exhibitors", exhibitorsString);
         }
 
         #endregion

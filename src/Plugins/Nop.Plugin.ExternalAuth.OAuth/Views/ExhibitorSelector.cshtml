@@ -1,13 +1,22 @@
-﻿@model string
+﻿@using Nop.Plugin.ExternalAuth.OAuth.Models
+@model ExhibitorModel[]
+
+@inject Nop.Core.IWebHelper webHelper
 
 @{
     Layout = ""; 
 }
 
 @{
-  var exhibitors = Model.Split(';').Select(s => new SelectListItem(s, s));
+  var returnUrl = webHelper.GetRawUrl(Context.Request);
+  var selectItems = Model.Select(ex => new SelectListItem
+  {
+    Text = ex.Exhibitor + " @ " + ex.Event,
+    Value = Url.ActionLink("SelectExhibitor", "ExhibitorSelector", new { exhibitorId = ex.ExhibitorId, returnUrl = returnUrl }),
+    Selected = ex.IsSelected
+  }).ToList();
 
   <div class="exhibitor-selector">
-    <select id="exhibitorSelect" name="exhibitorSelect" asp-items="@exhibitors" onchange=""></select>
+    <select id="exhibitorSelect" name="exhibitorSelect" asp-items="@selectItems" onchange="window.location.href = this.value"></select>
   </div>
 }

@@ -1,6 +1,8 @@
-﻿using System.Threading.Tasks;
+﻿using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
+using Nop.Plugin.ExternalAuth.OAuth.Models;
 using Nop.Services.Common;
 using Nop.Web.Framework.Components;
 
@@ -10,12 +12,12 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Components
     /// Represents view component to display login button
     /// </summary>
     [ViewComponent(Name = OAuthAuthenticationDefaults.WIDGET_COMPONENT_NAME)]
-    public class OAuthAuthenticationViOAuthExhibitorSelectViewComponent: NopViewComponent
+    public class ExhibitorSelectorViewComponent : NopViewComponent
     {
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly IWorkContext _workContext;
 
-        public OAuthAuthenticationViOAuthExhibitorSelectViewComponent(
+        public ExhibitorSelectorViewComponent(
             IGenericAttributeService genericAttributeService,
             IWorkContext workContext
             )
@@ -33,11 +35,16 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Components
         public async Task<IViewComponentResult> InvokeAsync()
         {
             var customer = await _workContext.GetCurrentCustomerAsync();
-            var customerExhibitors = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
+            var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
 
-            if (string.IsNullOrEmpty(customerExhibitors))
+            if (string.IsNullOrEmpty(customerExhibitorsString)) 
                 return Content("");
-            
+
+            var customerExhibitors = JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
+
+            if (customerExhibitors is null || customerExhibitors.Length == 0)
+                return Content("");
+
             return View("~/Plugins/ExternalAuth.OAuth/Views/ExhibitorSelector.cshtml", customerExhibitors);
         }
     }
