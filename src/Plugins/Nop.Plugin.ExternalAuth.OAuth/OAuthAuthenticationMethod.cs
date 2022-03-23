@@ -2,16 +2,18 @@
 using System.Threading.Tasks;
 using Nop.Core;
 using Nop.Services.Authentication.External;
+using Nop.Services.Cms;
 using Nop.Services.Configuration;
 using Nop.Services.Localization;
 using Nop.Services.Plugins;
+using Nop.Web.Framework.Infrastructure;
 
 namespace Nop.Plugin.ExternalAuth.OAuth
 {
     /// <summary>
     /// Represents method for the authentication with Facebook account
     /// </summary>
-    public class OAuthAuthenticationMethod : BasePlugin, IExternalAuthenticationMethod
+    public class OAuthAuthenticationMethod : BasePlugin, IExternalAuthenticationMethod, IWidgetPlugin
     {
         #region Fields
 
@@ -51,6 +53,30 @@ namespace Nop.Plugin.ExternalAuth.OAuth
         public string GetPublicViewComponentName()
         {
             return OAuthAuthenticationDefaults.VIEW_COMPONENT_NAME;
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether to hide this plugin on the widget list page in the admin area
+        /// </summary>
+        public bool HideInWidgetList => false;
+
+        /// <summary>
+        /// Gets a name of a view component for displaying widget
+        /// </summary>
+        /// <param name="widgetZone">Name of the widget zone</param>
+        /// <returns>View component name</returns>
+        public string GetWidgetViewComponentName(string widgetZone)
+        {
+            return OAuthAuthenticationDefaults.WIDGET_COMPONENT_NAME;
+        }
+
+        /// <summary>
+        /// Gets widget zones where this widget should be rendered
+        /// </summary>
+        /// <returns>Widget zones</returns>
+        public Task<IList<string>> GetWidgetZonesAsync()
+        {
+            return Task.FromResult<IList<string>>(new List<string> { PublicWidgetZones.HeaderSelectors });
         }
 
         /// <summary>

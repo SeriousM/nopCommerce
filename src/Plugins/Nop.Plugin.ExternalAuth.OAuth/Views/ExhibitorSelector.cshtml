@@ -1,0 +1,13 @@
+﻿@model string
+
+@{
+    Layout = ""; 
+}
+
+@{
+  var exhibitors = Model.Split(';').Select(s => new SelectListItem(s, s));
+
+  <div class="exhibitor-selector">
+    <select id="exhibitorSelect" name="exhibitorSelect" asp-items="@exhibitors" onchange=""></select>
+  </div>
+}

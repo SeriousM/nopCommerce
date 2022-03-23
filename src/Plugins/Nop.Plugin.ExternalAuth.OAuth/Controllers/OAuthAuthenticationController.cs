@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -7,9 +8,12 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Nop.Core;
+using Nop.Core.Domain.Customers;
 using Nop.Plugin.ExternalAuth.OAuth.Models;
 using Nop.Services.Authentication.External;
+using Nop.Services.Common;
 using Nop.Services.Configuration;
+using Nop.Services.Customers;
 using Nop.Services.Localization;
 using Nop.Services.Messages;
 using Nop.Services.Security;
@@ -34,6 +38,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         private readonly ISettingService _settingService;
         private readonly IStoreContext _storeContext;
         private readonly IWorkContext _workContext;
+        private readonly ICustomerService _customerService;
+        private readonly IGenericAttributeService _genericAttributeService;
 
         #endregion
 
@@ -48,7 +54,10 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             IPermissionService permissionService,
             ISettingService settingService,
             IStoreContext storeContext,
-            IWorkContext workContext)
+            IWorkContext workContext,
+            ICustomerService customerService,
+            IGenericAttributeService genericAttributeService
+        )
         {
             this.oAuthExternalAuthSettings = oAuthExternalAuthSettings;
             _authenticationPluginManager = authenticationPluginManager;
@@ -60,6 +69,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             _settingService = settingService;
             _storeContext = storeContext;
             _workContext = workContext;
+            _customerService = customerService;
+            _genericAttributeService = genericAttributeService;
         }
 
         #endregion
@@ -165,7 +176,73 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             };
 
             //authenticate Nop user
-            return await _externalAuthenticationService.AuthenticateAsync(authenticationParameters, returnUrl);
+            var result = await _externalAuthenticationService.AuthenticateAsync(authenticationParameters, returnUrl);
+
+            var externalAuthenticationParameters = authenticationParameters;
+            var claimsPrincipal = authenticateResult.Principal;
+
+            await SynchronizeRolesFromClaimsAsync(externalAuthenticationParameters, claimsPrincipal);
+
+            return result;
+        }
+
+        private async Task SynchronizeRolesFromClaimsAsync(ExternalAuthenticationParameters externalAuthenticationParameters, ClaimsPrincipal claimsPrincipal)
+        {
+            var customer = await _customerService.GetCustomerByEmailAsync(externalAuthenticationParameters.Email);
+            var thisCustomerRoles = await _customerService.GetCustomerRolesAsync(customer);
+
+            await SynchronizeAdminRoleFromClaimsAsync(claimsPrincipal, thisCustomerRoles, customer);
+            await SynchronizeEventRolesFromClaimsAsync(claimsPrincipal,  customer);
+        }
+
+        private async Task SynchronizeEventRolesFromClaimsAsync(ClaimsPrincipal claimsPrincipal, Customer customer)
+        {
+            var eventExhibitorIds = claimsPrincipal.FindAll(claim => claim.Type == "event.exhibitor")
+                                                   .Select(claim => claim.Value).ToArray();
+
+            await _genericAttributeService.SaveAttributeAsync(customer, "Exhibitors", string.Join(';', eventExhibitorIds));
+
+            //var nonSystemRoles = thisCustomerRoles.Where(r => !r.IsSystemRole);
+            //foreach (var roleToRemove in nonSystemRoles)
+            //{
+            //    await _customerService.RemoveCustomerRoleMappingAsync(customer, roleToRemove);
+            //}
+
+            //var allCustomerRoles = await _customerService.GetAllCustomerRolesAsync();
+
+            //var availableRoles = allCustomerRoles.Join(eventIds, cr => cr.Name, e => e, (role, _) => role);
+            //foreach (var role in availableRoles)
+            //{
+            //    await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
+            //    {
+            //        CustomerId = customer.Id, CustomerRoleId = role.Id
+            //    });
+            //}
+        }
+
+        private async Task SynchronizeAdminRoleFromClaimsAsync(ClaimsPrincipal claimsPrincipal, IEnumerable<CustomerRole> thisCustomerRoles, Customer customer)
+        {
+            var adminRole = await _customerService.GetCustomerRoleByIdAsync(1);
+
+            var adminClaimExists = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
+                                                                 && claim.Value == "role.shop.admin").Any();
+            if (!adminClaimExists)
+            {
+                if (thisCustomerRoles.Any(r => r.Id == adminRole.Id))
+                {
+                    await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
+                }
+            }
+            else
+            {
+                if (thisCustomerRoles.All(r => r.Id != adminRole.Id))
+                {
+                    await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
+                    {
+                        CustomerId = customer.Id, CustomerRoleId = adminRole.Id
+                    });
+                }
+            }
         }
 
         #endregion
