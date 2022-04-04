@@ -239,7 +239,22 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                                      Exhibitor = "Exhibitor: " + exhibitorId,
                                      ExhibitorId = exhibitorId
                                  };
-                             });
+                             }).ToArray();
+
+            var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
+            var customerExhibitors = JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
+
+            var selectedExhibitor = customerExhibitors?.Single(e => e.IsSelected);
+            var exhibitorForPreselection = exhibitors.SingleOrDefault(ex => ex.ExhibitorId == selectedExhibitor?.ExhibitorId);
+
+            if (exhibitorForPreselection is not null)
+            {
+                exhibitorForPreselection.IsSelected = true;
+            }
+            else
+            {
+                exhibitors.First().IsSelected = true;
+            }
 
             var exhibitorsString = JsonSerializer.Serialize(exhibitors);
 
