@@ -29,7 +29,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
     {
         #region Fields
 
-        private readonly OAuthExternalAuthSettings oAuthExternalAuthSettings;
+        private readonly OAuthExternalAuthSettings _oAuthExternalAuthSettings;
         private readonly IAuthenticationPluginManager _authenticationPluginManager;
         private readonly IExternalAuthenticationService _externalAuthenticationService;
         private readonly ILocalizationService _localizationService;
@@ -60,7 +60,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             IGenericAttributeService genericAttributeService
         )
         {
-            this.oAuthExternalAuthSettings = oAuthExternalAuthSettings;
+            _oAuthExternalAuthSettings = oAuthExternalAuthSettings;
             _authenticationPluginManager = authenticationPluginManager;
             _externalAuthenticationService = externalAuthenticationService;
             _localizationService = localizationService;
@@ -87,9 +87,9 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
             var model = new ConfigurationModel
             {
-                AuthorityUrl = oAuthExternalAuthSettings.AuthorityUrl,
-                ClientId = oAuthExternalAuthSettings.ClientKeyIdentifier,
-                AdditionalScopes = oAuthExternalAuthSettings.AdditionalScopes
+                AuthorityUrl = _oAuthExternalAuthSettings.AuthorityUrl,
+                ClientId = _oAuthExternalAuthSettings.ClientKeyIdentifier,
+                AdditionalScopes = _oAuthExternalAuthSettings.AdditionalScopes
             };
 
             return View("~/Plugins/ExternalAuth.OAuth/Views/Configure.cshtml", model);
@@ -107,10 +107,10 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 return await Configure();
 
             //save settings
-            oAuthExternalAuthSettings.AuthorityUrl = model.AuthorityUrl;
-            oAuthExternalAuthSettings.ClientKeyIdentifier = model.ClientId;
-            oAuthExternalAuthSettings.AdditionalScopes = ParseScopes(model.AdditionalScopes);
-            await _settingService.SaveSettingAsync(oAuthExternalAuthSettings);
+            _oAuthExternalAuthSettings.AuthorityUrl = model.AuthorityUrl;
+            _oAuthExternalAuthSettings.ClientKeyIdentifier = model.ClientId;
+            _oAuthExternalAuthSettings.AdditionalScopes = ParseScopes(model.AdditionalScopes);
+            await _settingService.SaveSettingAsync(_oAuthExternalAuthSettings);
 
             //clear OAuth authentication options cache
             _optionsCache.TryRemove(OpenIdConnectDefaults.AuthenticationScheme);
@@ -142,8 +142,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
             // note: scopes and secret may be empty.
 
-            if (string.IsNullOrEmpty(oAuthExternalAuthSettings.AuthorityUrl) ||
-                string.IsNullOrEmpty(oAuthExternalAuthSettings.ClientKeyIdentifier))
+            if (string.IsNullOrEmpty(_oAuthExternalAuthSettings.AuthorityUrl) ||
+                string.IsNullOrEmpty(_oAuthExternalAuthSettings.ClientKeyIdentifier))
             {
                 throw new NopException("OAuth authentication module not configured");
             }
