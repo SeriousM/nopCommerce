@@ -21,6 +21,7 @@ using Nop.Services.Security;
 using Nop.Web.Framework;
 using Nop.Web.Framework.Controllers;
 using Nop.Web.Framework.Mvc.Filters;
+using IAuthenticationService = Nop.Services.Authentication.IAuthenticationService;
 
 namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 {
@@ -41,6 +42,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         private readonly IWorkContext _workContext;
         private readonly ICustomerService _customerService;
         private readonly IGenericAttributeService _genericAttributeService;
+        private readonly IAuthenticationService _authenticationService;
 
         #endregion
 
@@ -57,7 +59,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             IStoreContext storeContext,
             IWorkContext workContext,
             ICustomerService customerService,
-            IGenericAttributeService genericAttributeService
+            IGenericAttributeService genericAttributeService,
+            IAuthenticationService authenticationService
         )
         {
             _oAuthExternalAuthSettings = oAuthExternalAuthSettings;
@@ -72,6 +75,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             _workContext = workContext;
             _customerService = customerService;
             _genericAttributeService = genericAttributeService;
+            _authenticationService = authenticationService;
         }
 
         #endregion
@@ -185,6 +189,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             await SynchronizeRolesFromClaimsAsync(externalAuthenticationParameters, claimsPrincipal);
 
             return result;
+        }
+
+        public async Task Logout()
+        {
+            await _authenticationService.SignOutAsync();
+
+            await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         private async Task SynchronizeRolesFromClaimsAsync(ExternalAuthenticationParameters externalAuthenticationParameters, ClaimsPrincipal claimsPrincipal)

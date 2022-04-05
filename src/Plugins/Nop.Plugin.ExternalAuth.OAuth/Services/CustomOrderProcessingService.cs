@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System;
+using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Nop.Core;
@@ -146,7 +147,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             {
                 OrderId = placedOrder.Id,
                 Note = $"ExhibitorId set to: {selectedExhibitor.ExhibitorId}",
-                DisplayToCustomer = false
+                DisplayToCustomer = false,
+                CreatedOnUtc = DateTime.UtcNow
             });
 
             return placeOrderResult;

@@ -15,6 +15,14 @@ public class OAuthRouteProvider : IRouteProvider
                 controller = "OAuthAuthentication",
                 action = "Login"
             });
+
+        endpointRouteBuilder.MapControllerRoute("Plugin.ExternalAuth.OAuth.Logout",
+            "logout",
+            new
+            {
+                controller = "OAuthAuthentication",
+                action = "Logout"
+            });
     }
 
     public int Priority => 10000;
