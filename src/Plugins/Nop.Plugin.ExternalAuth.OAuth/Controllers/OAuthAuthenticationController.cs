@@ -6,8 +6,10 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Plugin.ExternalAuth.OAuth.Models;
@@ -173,7 +175,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var authenticationParameters = new ExternalAuthenticationParameters
             {
                 ProviderSystemName = OAuthAuthenticationDefaults.SystemName,
-                AccessToken = await HttpContext.GetTokenAsync(OpenIdConnectDefaults.AuthenticationScheme, "id_token"),
+                AccessToken = await HttpContext.GetTokenAsync(OpenIdConnectDefaults.AuthenticationScheme, OpenIdConnectParameterNames.IdToken),
                 Email = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Email)?.Value,
                 ExternalIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.NameIdentifier)?.Value,
                 ExternalDisplayIdentifier = authenticateResult.Principal.FindFirst(claim => claim.Type == ClaimTypes.Name)?.Value,
@@ -193,9 +195,18 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
         public async Task Logout()
         {
+            var authenticationProperties = new AuthenticationProperties();
+
+            // Retrieve id_token before signing out so we can pass it to IdentityServer for global sign out
+            var currentCustomer = await _workContext.GetCurrentCustomerAsync();
+            var customerExternalAuthenticationRecords = await _externalAuthenticationService.GetCustomerExternalAuthenticationRecordsAsync(currentCustomer);
+            var oauthAuthenticationRecord = customerExternalAuthenticationRecords.SingleOrDefault(r => r.ProviderSystemName == OAuthAuthenticationDefaults.SystemName);
+
+            authenticationProperties.SetParameter(OpenIdConnectParameterNames.IdTokenHint, oauthAuthenticationRecord?.OAuthAccessToken);
+
             await _authenticationService.SignOutAsync();
 
-            await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+            await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme, authenticationProperties);
         }
 
         private async Task SynchronizeRolesFromClaimsAsync(ExternalAuthenticationParameters externalAuthenticationParameters, ClaimsPrincipal claimsPrincipal)
