@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
+using Nop.Data;
 using Nop.Plugin.ExternalAuth.OAuth.Models;
 using Nop.Services.Authentication.External;
 using Nop.Services.Common;
@@ -44,6 +45,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         private readonly ICustomerService _customerService;
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly IAuthenticationService _authenticationService;
+        private readonly IRepository<ExternalAuthenticationRecord> _externalAuthenticationRecordRepository;
 
         #endregion
 
@@ -61,8 +63,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             IWorkContext workContext,
             ICustomerService customerService,
             IGenericAttributeService genericAttributeService,
-            IAuthenticationService authenticationService
-        )
+            IAuthenticationService authenticationService,
+            IRepository<ExternalAuthenticationRecord> externalAuthenticationRecordRepository)
         {
             _oAuthExternalAuthSettings = oAuthExternalAuthSettings;
             _authenticationPluginManager = authenticationPluginManager;
@@ -77,6 +79,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             _customerService = customerService;
             _genericAttributeService = genericAttributeService;
             _authenticationService = authenticationService;
+            _externalAuthenticationRecordRepository = externalAuthenticationRecordRepository;
         }
 
         #endregion
@@ -183,22 +186,45 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 Claims = authenticateResult.Principal.Claims.Select(claim => new ExternalAuthenticationClaim(claim.Type, claim.Value)).ToList()
             };
 
-            // Authenticate Nop user
-            var result = await _externalAuthenticationService.AuthenticateAsync(authenticationParameters, returnUrl);
-
             var externalAuthenticationParameters = authenticationParameters;
             var claimsPrincipal = authenticateResult.Principal;
 
             await SynchronizeRolesFromClaimsAsync(externalAuthenticationParameters, claimsPrincipal);
+
+            // Authenticate Nop user
+            var result = await _externalAuthenticationService.AuthenticateAsync(authenticationParameters, returnUrl);
+
+            var maybeUser = await _externalAuthenticationService.GetUserByExternalAuthenticationParametersAsync(authenticationParameters);
+
+            if (maybeUser is null)
+            {
+                return result;
+            }
+
+            var customerAuthRecords = await _externalAuthenticationService.GetCustomerExternalAuthenticationRecordsAsync(maybeUser);
+            var customerAuthRecord = customerAuthRecords.SingleOrDefault(r => r.ProviderSystemName == OAuthAuthenticationDefaults.SystemName);
+
+            if (customerAuthRecord is not null)
+            {
+                customerAuthRecord.OAuthAccessToken = authenticationParameters.AccessToken;
+                await _externalAuthenticationRecordRepository.UpdateAsync(customerAuthRecord);
+            }
 
             return result;
         }
 
         public async Task<IActionResult> Logout()
         {
+            // Retrieve id_token before signing out so we can pass it to IdentityServer for global sign out
+            var currentCustomer = await _workContext.GetCurrentCustomerAsync();
+            var customerExternalAuthenticationRecords = await _externalAuthenticationService.GetCustomerExternalAuthenticationRecordsAsync(currentCustomer);
+            var oauthAuthenticationRecord = customerExternalAuthenticationRecords.SingleOrDefault(r => r.ProviderSystemName == OAuthAuthenticationDefaults.SystemName);
+
+            var authenticationProperties = new AuthenticationProperties();
+            authenticationProperties.SetParameter(OpenIdConnectParameterNames.IdTokenHint, oauthAuthenticationRecord?.OAuthAccessToken);
+
             await _authenticationService.SignOutAsync();
-            // Sign out from Account Server as well
-            return SignOut(OpenIdConnectDefaults.AuthenticationScheme);
+            return SignOut(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         private async Task SynchronizeRolesFromClaimsAsync(ExternalAuthenticationParameters externalAuthenticationParameters, ClaimsPrincipal claimsPrincipal)
