@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
@@ -242,18 +241,18 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
             var adminRole = await _customerService.GetCustomerRoleByIdAsync(1);
 
-            var adminClaimExists = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
+            var shouldBeAdmin = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
                                                                  && claim.Value == "role.shop.admin").Any();
 
-            var hasNoAdminRoles = thisCustomerRoles.All(r => r.Id != adminRole.Id);
-            if (adminClaimExists && hasNoAdminRoles)
+            var isAdmin = thisCustomerRoles.Any(r => r.Id == adminRole.Id);
+            if (shouldBeAdmin && !isAdmin)
             {
                 await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
                 {
                     CustomerId = customer.Id, CustomerRoleId = adminRole.Id
                 });
             }
-            else
+            else if(isAdmin)
             {
                 await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
             }
