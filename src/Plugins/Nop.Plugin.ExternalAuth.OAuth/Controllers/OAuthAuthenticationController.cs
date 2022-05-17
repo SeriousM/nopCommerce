@@ -245,16 +245,16 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                                                                  && claim.Value == "role.shop.admin").Any();
 
             var isAdmin = thisCustomerRoles.Any(r => r.Id == adminRole.Id);
-            if (shouldBeAdmin && !isAdmin)
+            if (!shouldBeAdmin && isAdmin)
+            {
+                await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
+            }
+            else if (shouldBeAdmin && !isAdmin)
             {
                 await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
                 {
                     CustomerId = customer.Id, CustomerRoleId = adminRole.Id
                 });
-            }
-            else if(isAdmin)
-            {
-                await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
             }
         }
 
