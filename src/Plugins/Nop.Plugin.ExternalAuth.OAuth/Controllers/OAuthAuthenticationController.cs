@@ -186,11 +186,6 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 Claims = authenticateResult.Principal.Claims.Select(claim => new ExternalAuthenticationClaim(claim.Type, claim.Value)).ToList()
             };
 
-            var externalAuthenticationParameters = authenticationParameters;
-            var claimsPrincipal = authenticateResult.Principal;
-
-            await SynchronizeRolesFromClaimsAsync(externalAuthenticationParameters, claimsPrincipal);
-
             // Authenticate Nop user
             var result = await _externalAuthenticationService.AuthenticateAsync(authenticationParameters, returnUrl);
 
@@ -200,6 +195,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             {
                 return result;
             }
+            
+            await SynchronizeRolesFromClaimsAsync(authenticationParameters, authenticateResult);
 
             var customerAuthRecords = await _externalAuthenticationService.GetCustomerExternalAuthenticationRecordsAsync(maybeUser);
             var customerAuthRecord = customerAuthRecords.SingleOrDefault(r => r.ProviderSystemName == OAuthAuthenticationDefaults.SystemName);
@@ -209,6 +206,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 customerAuthRecord.OAuthAccessToken = authenticationParameters.AccessToken;
                 await _externalAuthenticationRecordRepository.UpdateAsync(customerAuthRecord);
             }
+
+            ;
 
             return result;
         }
@@ -227,31 +226,31 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             return SignOut(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
         }
 
-        private async Task SynchronizeRolesFromClaimsAsync(ExternalAuthenticationParameters externalAuthenticationParameters, ClaimsPrincipal claimsPrincipal)
+        private async Task SynchronizeRolesFromClaimsAsync(ExternalAuthenticationParameters externalAuthenticationParameters, AuthenticateResult authenticateResult)
         {
             var customer = await _customerService.GetCustomerByEmailAsync(externalAuthenticationParameters.Email);
-            var thisCustomerRoles = await _customerService.GetCustomerRolesAsync(customer);
 
-            await SynchronizeAdminRoleFromClaimsAsync(claimsPrincipal, thisCustomerRoles, customer);
-            await SynchronizeEventRolesFromClaimsAsync(claimsPrincipal,  customer);
+            var claimsPrincipal = authenticateResult.Principal;
+
+            await SynchronizeAdminRoleFromClaimsAsync(claimsPrincipal, customer);
+            await SynchronizeEventRolesFromClaimsAsync(claimsPrincipal, customer);
         }
 
-        private async Task SynchronizeAdminRoleFromClaimsAsync(ClaimsPrincipal claimsPrincipal, IEnumerable<CustomerRole> thisCustomerRoles, Customer customer)
+        private async Task SynchronizeAdminRoleFromClaimsAsync(ClaimsPrincipal claimsPrincipal, Customer customer)
         {
+            var thisCustomerRoles = await _customerService.GetCustomerRolesAsync(customer);
+
             var adminRole = await _customerService.GetCustomerRoleByIdAsync(1);
 
             var adminClaimExists = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
                                                                  && claim.Value == "role.shop.admin").Any();
-            if (!adminClaimExists)
+            if (thisCustomerRoles.Any(r => r.Id == adminRole.Id))
             {
-                if (thisCustomerRoles.Any(r => r.Id == adminRole.Id))
+                if (!adminClaimExists)
                 {
                     await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
                 }
-            }
-            else
-            {
-                if (thisCustomerRoles.All(r => r.Id != adminRole.Id))
+                else
                 {
                     await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
                     {
