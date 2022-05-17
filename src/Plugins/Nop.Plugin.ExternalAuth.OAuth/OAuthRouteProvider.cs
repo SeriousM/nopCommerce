@@ -8,7 +8,8 @@ public class OAuthRouteProvider : IRouteProvider
 {
     public void RegisterRoutes(IEndpointRouteBuilder endpointRouteBuilder)
     {
-        endpointRouteBuilder.MapControllerRoute("Plugin.ExternalAuth.OAuth.Login",
+        // Override Default Login
+        endpointRouteBuilder.MapControllerRoute("Login",
             "login",
             new
             {
@@ -16,7 +17,15 @@ public class OAuthRouteProvider : IRouteProvider
                 action = "Login"
             });
 
-        endpointRouteBuilder.MapControllerRoute("Plugin.ExternalAuth.OAuth.Logout",
+        endpointRouteBuilder.MapControllerRoute("LoginLocal",
+            "login/local",
+            new
+            {
+                controller = "Customer",
+                action = "Login"
+            });
+
+        endpointRouteBuilder.MapControllerRoute("Logout",
             "logout",
             new
             {

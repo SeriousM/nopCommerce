@@ -6,7 +6,6 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
@@ -112,13 +111,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             if (!ModelState.IsValid)
                 return await Configure();
 
-            //save settings
+            // Save settings
             _oAuthExternalAuthSettings.AuthorityUrl = model.AuthorityUrl;
             _oAuthExternalAuthSettings.ClientKeyIdentifier = model.ClientId;
             _oAuthExternalAuthSettings.AdditionalScopes = ParseScopes(model.AdditionalScopes);
             await _settingService.SaveSettingAsync(_oAuthExternalAuthSettings);
 
-            //clear OAuth authentication options cache
+            // Clear OAuth authentication options cache
             _optionsCache.TryRemove(OpenIdConnectDefaults.AuthenticationScheme);
 
             _notificationService.SuccessNotification(await _localizationService.GetResourceAsync("Admin.Plugins.Saved"));
@@ -144,34 +143,35 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var methodIsAvailable = await _authenticationPluginManager
                 .IsPluginActiveAsync(OAuthAuthenticationDefaults.SystemName, await _workContext.GetCurrentCustomerAsync(), store.Id);
             if (!methodIsAvailable)
-                throw new NopException("OAuth authentication module cannot be loaded");
+            {
+                return RedirectToAction("Login", "Customer");
+            }
 
-            // note: scopes and secret may be empty.
-
+            // Note: scopes and secret may be empty.
             if (string.IsNullOrEmpty(_oAuthExternalAuthSettings.AuthorityUrl) ||
                 string.IsNullOrEmpty(_oAuthExternalAuthSettings.ClientKeyIdentifier))
             {
-                throw new NopException("OAuth authentication module not configured");
+                return RedirectToAction("Login", "Customer");
             }
 
-            //configure login callback action
+            // Configure login callback action
             var authenticationProperties = new AuthenticationProperties
             {
                 RedirectUri = Url.Action("LoginCallback", "OAuthAuthentication", new { returnUrl = returnUrl })
             };
-            authenticationProperties.SetString(OAuthAuthenticationDefaults.ErrorCallback, Url.RouteUrl("Login", new { returnUrl }));
+            authenticationProperties.SetString(OAuthAuthenticationDefaults.ErrorCallback, Url.Action("Index", "Home", new { returnUrl }));
 
             return Challenge(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
         }
 
         public async Task<IActionResult> LoginCallback(string returnUrl)
         {
-            //authenticate OAuth user
+            // Authenticate OAuth user
             var authenticateResult = await HttpContext.AuthenticateAsync(OpenIdConnectDefaults.AuthenticationScheme);
             if (!authenticateResult.Succeeded || !authenticateResult.Principal.Claims.Any())
                 return RedirectToRoute("Login");
 
-            //create external authentication parameters
+            // Create external authentication parameters
             var authenticationParameters = new ExternalAuthenticationParameters
             {
                 ProviderSystemName = OAuthAuthenticationDefaults.SystemName,
@@ -182,7 +182,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 Claims = authenticateResult.Principal.Claims.Select(claim => new ExternalAuthenticationClaim(claim.Type, claim.Value)).ToList()
             };
 
-            //authenticate Nop user
+            // Authenticate Nop user
             var result = await _externalAuthenticationService.AuthenticateAsync(authenticationParameters, returnUrl);
 
             var externalAuthenticationParameters = authenticationParameters;
@@ -203,7 +203,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var oauthAuthenticationRecord = customerExternalAuthenticationRecords.SingleOrDefault(r => r.ProviderSystemName == OAuthAuthenticationDefaults.SystemName);
 
             authenticationProperties.SetParameter(OpenIdConnectParameterNames.IdTokenHint, oauthAuthenticationRecord?.OAuthAccessToken);
-
+            
             await _authenticationService.SignOutAsync();
 
             await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme, authenticationProperties);

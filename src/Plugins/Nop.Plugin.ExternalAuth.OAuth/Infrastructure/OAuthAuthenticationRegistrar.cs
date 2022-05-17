@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Nop.Core.Infrastructure;
 using Nop.Services.Authentication.External;
@@ -43,12 +44,15 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
                 // force https required. only during dev!
                 options.RequireHttpsMetadata = false;
 
+                options.NonceCookie.SameSite = SameSiteMode.Unspecified;
+                options.CorrelationCookie.SameSite = SameSiteMode.Unspecified;
+
                 // "metadata" address..?
                 //options.MetadataAddress
 
                 // set to "id_token" (OpenIdConnectResponseType.IdToken)
                 //options.ResponseType
-                
+
                 //store access and refresh tokens for the further usage
                 options.SaveTokens = true;
                 
