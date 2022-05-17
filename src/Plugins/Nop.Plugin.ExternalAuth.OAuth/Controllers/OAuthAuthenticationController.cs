@@ -264,14 +264,14 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                              }).ToArray();
 
             var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
-            var customerExhibitors = JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
+            var customerExhibitors = customerExhibitorsString is null ? null : JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
 
-            var selectedExhibitor = customerExhibitors?.Single(e => e.IsSelected);
-            var exhibitorForPreselection = exhibitors.SingleOrDefault(ex => ex.ExhibitorId == selectedExhibitor?.ExhibitorId);
+            var selectedExhibitor = customerExhibitors?.SingleOrDefault(e => e.IsSelected);
+            var exhibitorToSelect = exhibitors.SingleOrDefault(ex => ex.ExhibitorId == selectedExhibitor?.ExhibitorId);
 
-            if (exhibitorForPreselection is not null)
+            if (exhibitorToSelect is not null)
             {
-                exhibitorForPreselection.IsSelected = true;
+                exhibitorToSelect.IsSelected = true;
             }
             else
             {
