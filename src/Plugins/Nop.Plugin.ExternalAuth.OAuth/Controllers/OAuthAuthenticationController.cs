@@ -137,6 +137,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             return scopes;
         }
 
+        [HttpGet]
         public async Task<IActionResult> Login(string returnUrl)
         {
             var store = await _storeContext.GetCurrentStoreAsync();
