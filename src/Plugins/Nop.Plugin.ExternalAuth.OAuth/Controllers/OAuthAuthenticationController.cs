@@ -244,19 +244,18 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
             var adminClaimExists = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
                                                                  && claim.Value == "role.shop.admin").Any();
-            if (thisCustomerRoles.Any(r => r.Id == adminRole.Id))
+
+            var hasNoAdminRoles = thisCustomerRoles.All(r => r.Id != adminRole.Id);
+            if (adminClaimExists && hasNoAdminRoles)
             {
-                if (!adminClaimExists)
+                await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
                 {
-                    await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
-                }
-                else
-                {
-                    await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
-                    {
-                        CustomerId = customer.Id, CustomerRoleId = adminRole.Id
-                    });
-                }
+                    CustomerId = customer.Id, CustomerRoleId = adminRole.Id
+                });
+            }
+            else
+            {
+                await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
             }
         }
 
