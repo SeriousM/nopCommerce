@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Nop.Core.Infrastructure;
+using Nop.Services.Authentication;
 using Nop.Services.Authentication.External;
 
 namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
@@ -21,6 +22,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
         /// <param name="builder">Authentication builder</param>
         public void Configure(AuthenticationBuilder builder)
         {
+            builder.AddCookie("oidc", options =>
+            {
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.LoginPath = NopAuthenticationDefaults.LoginPath;
+                options.AccessDeniedPath = NopAuthenticationDefaults.AccessDeniedPath;
+            });
             builder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
                 //set credentials
@@ -46,6 +54,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
 
                 options.NonceCookie.SameSite = SameSiteMode.Unspecified;
                 options.CorrelationCookie.SameSite = SameSiteMode.Unspecified;
+
+                options.SignInScheme = "oidc";
 
                 // "metadata" address..?
                 //options.MetadataAddress
