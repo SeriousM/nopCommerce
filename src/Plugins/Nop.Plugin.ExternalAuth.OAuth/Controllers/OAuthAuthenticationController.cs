@@ -241,15 +241,17 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
             var adminRole = await _customerService.GetCustomerRoleByIdAsync(1);
 
+            var isAdmin = thisCustomerRoles.Any(r => r.Id == adminRole.Id);
+
             var shouldBeAdmin = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
                                                                  && claim.Value == "role.shop.admin").Any();
 
-            var isAdmin = thisCustomerRoles.Any(r => r.Id == adminRole.Id);
             if (!shouldBeAdmin && isAdmin)
             {
                 await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
             }
-            else if (shouldBeAdmin && !isAdmin)
+            
+            if (shouldBeAdmin && !isAdmin)
             {
                 await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
                 {
@@ -277,6 +279,11 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                                      ExhibitorId = exhibitorId
                                  };
                              }).ToArray();
+
+            if (exhibitors.Length == 0)
+            {
+                return;
+            }
 
             var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
             var customerExhibitors = customerExhibitorsString is null ? null : JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
