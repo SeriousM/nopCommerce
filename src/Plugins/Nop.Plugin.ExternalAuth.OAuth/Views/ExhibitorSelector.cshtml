@@ -1,5 +1,5 @@
 ﻿@using Nop.Plugin.ExternalAuth.OAuth.Models
-@model ExhibitorModel[]
+@model ExhibitorSelectorModel
 
 @inject Nop.Core.IWebHelper webHelper
 
@@ -9,11 +9,11 @@
 
 @{
   var returnUrl = webHelper.GetRawUrl(Context.Request);
-  var selectItems = Model.Select(ex => new SelectListItem
+  var selectItems = Model.Exhibitors.Select(ex => new SelectListItem
   {
     Text = ex.Exhibitor + " @ " + ex.Event,
     Value = Url.ActionLink("SelectExhibitor", "ExhibitorSelector", new { exhibitorId = ex.ExhibitorId, returnUrl = returnUrl }),
-    Selected = ex.IsSelected
+    Selected = ex.IdEquals(Model.SelectedExhibitorId)
   }).ToList();
 
   <div class="exhibitor-selector">

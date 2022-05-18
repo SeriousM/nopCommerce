@@ -35,7 +35,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Components
         public async Task<IViewComponentResult> InvokeAsync()
         {
             var customer = await _workContext.GetCurrentCustomerAsync();
-            var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
+            var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.Exhibitors);
 
             if (string.IsNullOrEmpty(customerExhibitorsString)) 
                 return Content("");
@@ -45,7 +45,14 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Components
             if (customerExhibitors is null || customerExhibitors.Length == 0)
                 return Content("");
 
-            return View("~/Plugins/ExternalAuth.OAuth/Views/ExhibitorSelector.cshtml", customerExhibitors);
+            var selectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
+
+            var model = new ExhibitorSelectorModel
+            {
+                Exhibitors = customerExhibitors, SelectedExhibitorId = selectedExhibitorId
+            };
+
+            return View("~/Plugins/ExternalAuth.OAuth/Views/ExhibitorSelector.cshtml", model);
         }
     }
 }

@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Linq;
-using System.Text.Json;
 using System.Threading.Tasks;
 using Nop.Core;
-using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Localization;
@@ -12,7 +9,6 @@ using Nop.Core.Domain.Payments;
 using Nop.Core.Domain.Shipping;
 using Nop.Core.Domain.Tax;
 using Nop.Core.Events;
-using Nop.Plugin.ExternalAuth.OAuth.Models;
 using Nop.Services.Affiliates;
 using Nop.Services.Catalog;
 using Nop.Services.Common;
@@ -136,17 +132,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             var placedOrder = placeOrderResult.PlacedOrder;
 
             var customer = await _customerService.GetCustomerByIdAsync(placedOrder.CustomerId);
+            var selectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
 
-            var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
-            var customerExhibitors = JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
-
-            var selectedExhibitor = customerExhibitors?.Single(e => e.IsSelected);
-
-            await _genericAttributeService.SaveAttributeAsync(placedOrder, "ExhibitorId", selectedExhibitor.ExhibitorId);
+            await _genericAttributeService.SaveAttributeAsync(placedOrder, OAuthAuthenticationDefaults.CustomAttributes.OrderExhibitorId, selectedExhibitorId);
             await _orderService.InsertOrderNoteAsync(new OrderNote
             {
                 OrderId = placedOrder.Id,
-                Note = $"ExhibitorId set to: {selectedExhibitor.ExhibitorId}",
+                Note = $"ExhibitorId set to: {selectedExhibitorId}",
                 DisplayToCustomer = false,
                 CreatedOnUtc = DateTime.UtcNow
             });

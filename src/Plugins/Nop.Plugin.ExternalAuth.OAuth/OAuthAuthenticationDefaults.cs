@@ -24,5 +24,18 @@
         /// Gets a name of error callback method
         /// </summary>
         public static string ErrorCallback = "ErrorCallback";
+
+        public static class CustomAttributes
+        {
+            public static string Exhibitors = "Exhibitors";
+            public static string SelectedExhibitorId = "SelectedExhibitorId";
+            public static string OrderExhibitorId = "ExhibitorId";
+        }
+
+        public static class ClaimNames
+        {
+            public static string ShopAdmin = "role.shop.admin";
+            public static string ExhibitorEvent = "event.exhibitor";
+        }
     }
 }

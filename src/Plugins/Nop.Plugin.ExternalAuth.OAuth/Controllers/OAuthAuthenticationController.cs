@@ -239,12 +239,12 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         {
             var thisCustomerRoles = await _customerService.GetCustomerRolesAsync(customer);
 
-            var adminRole = await _customerService.GetCustomerRoleByIdAsync(1);
+            var adminRole = await _customerService.GetCustomerRoleBySystemNameAsync(NopCustomerDefaults.AdministratorsRoleName);
 
             var isAdmin = thisCustomerRoles.Any(r => r.Id == adminRole.Id);
 
             var shouldBeAdmin = claimsPrincipal.FindAll(claim => claim.Type == ClaimTypes.Role
-                                                                 && claim.Value == "role.shop.admin").Any();
+                                                                 && claim.Value == OAuthAuthenticationDefaults.ClaimNames.ShopAdmin).Any();
 
             if (!shouldBeAdmin && isAdmin)
             {
@@ -262,7 +262,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
         private async Task SynchronizeEventRolesFromClaimsAsync(ClaimsPrincipal claimsPrincipal, Customer customer)
         {
-            var eventExhibitorIds = claimsPrincipal.FindAll(claim => claim.Type == "event.exhibitor")
+            var eventExhibitorIds = claimsPrincipal.FindAll(claim => claim.Type == OAuthAuthenticationDefaults.ClaimNames.ExhibitorEvent)
                                                    .Select(claim => claim.Value);
 
             var exhibitors = eventExhibitorIds
@@ -285,24 +285,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
                 return;
             }
 
-            var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, "Exhibitors");
-            var customerExhibitors = customerExhibitorsString is null ? null : JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
+            var selectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
+            selectedExhibitorId ??= exhibitors.First().ExhibitorId;
 
-            var selectedExhibitor = customerExhibitors?.SingleOrDefault(e => e.IsSelected);
-            var exhibitorToSelect = exhibitors.SingleOrDefault(ex => ex.ExhibitorId == selectedExhibitor?.ExhibitorId);
+            var exhibitorsJson = JsonSerializer.Serialize(exhibitors);
 
-            if (exhibitorToSelect is not null)
-            {
-                exhibitorToSelect.IsSelected = true;
-            }
-            else
-            {
-                exhibitors.First().IsSelected = true;
-            }
-
-            var exhibitorsString = JsonSerializer.Serialize(exhibitors);
-
-            await _genericAttributeService.SaveAttributeAsync(customer, "Exhibitors", exhibitorsString);
+            await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.Exhibitors, exhibitorsJson);
+            await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId, selectedExhibitorId);
         }
 
         #endregion
