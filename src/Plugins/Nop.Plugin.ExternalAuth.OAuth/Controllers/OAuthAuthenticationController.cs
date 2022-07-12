@@ -265,33 +265,53 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var eventExhibitorIds = claimsPrincipal.FindAll(claim => claim.Type == OAuthAuthenticationDefaults.ClaimNames.ExhibitorEvent)
                                                    .Select(claim => claim.Value);
 
-            var exhibitors = eventExhibitorIds
-                            .Select(ee => ee.Split('.'))
-                            .Select(ee =>
-                             {
-                                 var eventId = ee[0];
-                                 var exhibitorId = ee[1];
+            var eventExhibitorModels = eventExhibitorIds
+                                      .Select(ee => ee.Split('.'))
+                                      .Select(ee =>
+                                       {
+                                           var eventId = ee[0];
+                                           var exhibitorId = ee[1];
 
-                                 return new ExhibitorModel
-                                 {
-                                     Event = eventId,
-                                     Exhibitor = "Exhibitor: " + exhibitorId,
-                                     ExhibitorId = exhibitorId
-                                 };
-                             }).ToArray();
+                                           return new ExhibitorModel
+                                           {
+                                               Event = eventId, Exhibitor = "Exhibitor: " + exhibitorId, ExhibitorId = exhibitorId
+                                           };
+                                       }).ToArray();
 
-            if (exhibitors.Length == 0)
+            if (eventExhibitorModels.Length == 0)
             {
                 return;
             }
 
-            var selectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
-            selectedExhibitorId ??= exhibitors.First().ExhibitorId;
-
-            var exhibitorsJson = JsonSerializer.Serialize(exhibitors);
+            var exhibitorsJson = JsonSerializer.Serialize(eventExhibitorModels);
 
             await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.Exhibitors, exhibitorsJson);
-            await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId, selectedExhibitorId);
+
+            var customerRoles = await _customerService.GetCustomerRolesAsync(customer);
+            var rolesToRemove = customerRoles.Where(r => !r.IsSystemRole);
+            foreach (var role in rolesToRemove)
+            {
+                await _customerService.RemoveCustomerRoleMappingAsync(customer, role);
+            }
+
+            var lastSelectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
+            var maybeSelectedExhibitor = eventExhibitorModels.SingleOrDefault(ee => ee.ExhibitorId == lastSelectedExhibitorId);
+            var selectedExhibitor = maybeSelectedExhibitor ?? eventExhibitorModels.First();
+
+            await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId, selectedExhibitor.ExhibitorId);
+
+            var allRoles = await _customerService.GetAllCustomerRolesAsync();
+            var roleToAssign = allRoles.SingleOrDefault(r => r.SystemName == selectedExhibitor.Event);
+            if (roleToAssign is null)
+            {
+                return;
+            }
+
+            await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
+            {
+                CustomerId = customer.Id,
+                CustomerRoleId = roleToAssign.Id
+            });
         }
 
         #endregion
