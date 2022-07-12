@@ -1,4 +1,8 @@
 ﻿using System;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
@@ -32,22 +36,23 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ICustomerService _customerService;
         private readonly IOrderService _orderService;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public CustomOrderProcessingService(CurrencySettings currencySettings, 
-                                            IAddressService addressService, 
-                                            IAffiliateService affiliateService, 
-                                            ICheckoutAttributeFormatter checkoutAttributeFormatter, 
-                                            ICountryService countryService, 
-                                            ICurrencyService currencyService, 
-                                            ICustomerActivityService customerActivityService, 
-                                            ICustomerService customerService, 
-                                            ICustomNumberFormatter customNumberFormatter, 
-                                            IDiscountService discountService, 
-                                            IEncryptionService encryptionService, 
-                                            IEventPublisher eventPublisher, 
-                                            IGenericAttributeService genericAttributeService, 
-                                            IGiftCardService giftCardService, 
-                                            ILanguageService languageService, 
+        public CustomOrderProcessingService(CurrencySettings currencySettings,
+                                            IAddressService addressService,
+                                            IAffiliateService affiliateService,
+                                            ICheckoutAttributeFormatter checkoutAttributeFormatter,
+                                            ICountryService countryService,
+                                            ICurrencyService currencyService,
+                                            ICustomerActivityService customerActivityService,
+                                            ICustomerService customerService,
+                                            ICustomNumberFormatter customNumberFormatter,
+                                            IDiscountService discountService,
+                                            IEncryptionService encryptionService,
+                                            IEventPublisher eventPublisher,
+                                            IGenericAttributeService genericAttributeService,
+                                            IGiftCardService giftCardService,
+                                            ILanguageService languageService,
                                             ILocalizationService localizationService,
                                             ILogger logger,
                                             IOrderService orderService,
@@ -76,7 +81,9 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
                                             PaymentSettings paymentSettings,
                                             RewardPointsSettings rewardPointsSettings,
                                             ShippingSettings shippingSettings,
-                                            TaxSettings taxSettings) : base(currencySettings,
+                                            TaxSettings taxSettings,
+                                            IHttpClientFactory httpClientFactory) : base(
+            currencySettings,
             addressService,
             affiliateService,
             checkoutAttributeFormatter,
@@ -124,6 +131,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             _orderService = orderService;
             _genericAttributeService = genericAttributeService;
             _customerService = customerService;
+            _httpClientFactory = httpClientFactory;
         }
 
         public override async Task<PlaceOrderResult> PlaceOrderAsync(ProcessPaymentRequest processPaymentRequest)
@@ -144,6 +152,42 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             });
 
             return placeOrderResult;
+        }
+
+        protected override async Task ProcessOrderPaidAsync(Order order)
+        {
+            var exhibitorId = await _genericAttributeService.GetAttributeAsync<string>(order, OAuthAuthenticationDefaults.CustomAttributes.OrderExhibitorId);
+
+            var httpClient = _httpClientFactory.CreateClient("ShopFunctionClient");
+
+            var content = new
+            {
+                Order = order,
+                ExhibitorId = exhibitorId
+            };
+
+            var contentSerialized = JsonSerializer.Serialize(
+                content, 
+                new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    ReferenceHandler = ReferenceHandler.IgnoreCycles
+                });
+            
+            var request = new HttpRequestMessage
+            {
+                Method = HttpMethod.Post,
+                Headers =
+                {
+                    { "x-functions-key", "3Zk79TzAc-F7E1homp8D0JcXVl1fWm3hsqKwbiWGGehOAzFuaAgL2A==" }
+                },
+                Content = new StringContent(contentSerialized),
+                RequestUri = new Uri("https://function-shop-dev.azurewebsites.net/api/ShopFunction")
+            };
+
+            var response = await httpClient.SendAsync(request);
+
+            await base.ProcessOrderPaidAsync(order);
         }
     }
 }

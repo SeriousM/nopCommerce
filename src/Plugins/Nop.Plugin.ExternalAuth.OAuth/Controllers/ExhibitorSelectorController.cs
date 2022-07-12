@@ -55,7 +55,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             }
 
             var allRoles = await _customerService.GetAllCustomerRolesAsync();
-            var roleToAssign = allRoles.SingleOrDefault(r => r.Name == selectedExhibitor.Event);
+            var roleToAssign = allRoles.SingleOrDefault(r => r.SystemName == selectedExhibitor.Event);
             if (roleToAssign is null)
             {
                 return Redirect(returnUrl);
