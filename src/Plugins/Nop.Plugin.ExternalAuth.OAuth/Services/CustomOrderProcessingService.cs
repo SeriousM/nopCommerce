@@ -1,10 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Nop.Core;
+using Nop.Core.Domain.Catalog;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Directory;
 using Nop.Core.Domain.Localization;
@@ -36,6 +38,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ICustomerService _customerService;
         private readonly IOrderService _orderService;
+        private readonly IProductService _productService;
         private readonly IHttpClientFactory _httpClientFactory;
 
         public CustomOrderProcessingService(CurrencySettings currencySettings,
@@ -132,6 +135,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             _genericAttributeService = genericAttributeService;
             _customerService = customerService;
             _httpClientFactory = httpClientFactory;
+            _productService = productService;
         }
 
         public override async Task<PlaceOrderResult> PlaceOrderAsync(ProcessPaymentRequest processPaymentRequest)
@@ -154,16 +158,37 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             return placeOrderResult;
         }
 
+        public class OrderItemProduct
+        {
+            public OrderItem OrderItem { get; set; }
+            public Product Product { get; set; }
+        }
+
         protected override async Task ProcessOrderPaidAsync(Order order)
         {
             var exhibitorId = await _genericAttributeService.GetAttributeAsync<string>(order, OAuthAuthenticationDefaults.CustomAttributes.OrderExhibitorId);
 
             var httpClient = _httpClientFactory.CreateClient("ShopFunctionClient");
+            var orderItems = await _orderService.GetOrderItemsAsync(order.Id);
+
+            var orderItemsProduct = new List<OrderItemProduct>();
+
+            foreach (var orderItem in orderItems)
+            {
+                var product = await _productService.GetProductByIdAsync(orderItem.ProductId);
+
+                orderItemsProduct.Add(new OrderItemProduct
+                {
+                    OrderItem = orderItem,
+                    Product = product
+                });
+            }
 
             var content = new
             {
                 Order = order,
-                ExhibitorId = exhibitorId
+                ExhibitorId = exhibitorId,
+                OrderItems = orderItemsProduct
             };
 
             var contentSerialized = JsonSerializer.Serialize(

@@ -69,11 +69,12 @@ namespace Nop.Plugin.Payments.CheckMoneyOrder.Controllers
                 locale.DescriptionText = await _localizationService
                     .GetLocalizedSettingAsync(checkMoneyOrderPaymentSettings, x => x.DescriptionText, languageId, 0, false, false);
             });
+
             model.AdditionalFee = checkMoneyOrderPaymentSettings.AdditionalFee;
             model.AdditionalFeePercentage = checkMoneyOrderPaymentSettings.AdditionalFeePercentage;
             model.ShippableProductRequired = checkMoneyOrderPaymentSettings.ShippableProductRequired;
-
             model.ActiveStoreScopeConfiguration = storeScope;
+
             if (storeScope > 0)
             {
                 model.DescriptionText_OverrideForStore = await _settingService.SettingExistsAsync(checkMoneyOrderPaymentSettings, x => x.DescriptionText, storeScope);

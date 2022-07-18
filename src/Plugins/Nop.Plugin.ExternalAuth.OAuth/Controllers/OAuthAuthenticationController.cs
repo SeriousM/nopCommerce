@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -45,6 +47,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly IAuthenticationService _authenticationService;
         private readonly IRepository<ExternalAuthenticationRecord> _externalAuthenticationRecordRepository;
+        private readonly IHttpClientFactory _httpClientFactory;
 
         #endregion
 
@@ -63,7 +66,8 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             ICustomerService customerService,
             IGenericAttributeService genericAttributeService,
             IAuthenticationService authenticationService,
-            IRepository<ExternalAuthenticationRecord> externalAuthenticationRecordRepository)
+            IRepository<ExternalAuthenticationRecord> externalAuthenticationRecordRepository,
+            IHttpClientFactory httpClientFactory)
         {
             _oAuthExternalAuthSettings = oAuthExternalAuthSettings;
             _authenticationPluginManager = authenticationPluginManager;
@@ -79,6 +83,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             _genericAttributeService = genericAttributeService;
             _authenticationService = authenticationService;
             _externalAuthenticationRecordRepository = externalAuthenticationRecordRepository;
+            _httpClientFactory = httpClientFactory;
         }
 
         #endregion
@@ -102,7 +107,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             return View("~/Plugins/ExternalAuth.OAuth/Views/Configure.cshtml", model);
         }
 
-        [HttpPost]        
+        [HttpPost]
         [AuthorizeAdmin]
         [Area(AreaNames.Admin)]
         public async Task<IActionResult> Configure(ConfigurationModel model)
@@ -194,7 +199,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             {
                 return result;
             }
-            
+
             await SynchronizeRolesFromClaimsAsync(authenticationParameters, authenticateResult);
 
             var customerAuthRecords = await _externalAuthenticationService.GetCustomerExternalAuthenticationRecordsAsync(maybeUser);
@@ -250,12 +255,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             {
                 await _customerService.RemoveCustomerRoleMappingAsync(customer, adminRole);
             }
-            
+
             if (shouldBeAdmin && !isAdmin)
             {
                 await _customerService.AddCustomerRoleMappingAsync(new CustomerCustomerRoleMapping
                 {
-                    CustomerId = customer.Id, CustomerRoleId = adminRole.Id
+                    CustomerId = customer.Id,
+                    CustomerRoleId = adminRole.Id
                 });
             }
         }
@@ -274,16 +280,59 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
 
                                            return new ExhibitorModel
                                            {
-                                               Event = eventId, Exhibitor = "Exhibitor: " + exhibitorId, ExhibitorId = exhibitorId
+                                               EventId = eventId,
+                                               ExhibitorName = "ExhibitorName: " + exhibitorId,
+                                               ExhibitorId = exhibitorId
                                            };
-                                       }).ToArray();
+                                       }).ToList();
 
-            if (eventExhibitorModels.Length == 0)
+            if (eventExhibitorModels.Count == 0)
             {
                 return;
             }
 
-            var exhibitorsJson = JsonSerializer.Serialize(eventExhibitorModels);
+            var validEventExhibitors = new List<ExhibitorModel>();
+
+            var httpClient = _httpClientFactory.CreateClient("ShopFunctionClient");
+
+            foreach (var eventExhibitor in eventExhibitorModels)
+            {
+                var request = new HttpRequestMessage
+                {
+                    Method = HttpMethod.Get,
+                    Headers =
+                {
+                    { "x-functions-key", "QS-RRVqRvhz0UiozxWptJrTp1f2rshaZR96ctAnwmUOTAzFuIO49yg==" }
+                },
+                    RequestUri = new Uri($"https://function-shop-dev.azurewebsites.net/api/Exhibitor/{eventExhibitor.ExhibitorId}")
+                };
+
+                var response = await httpClient.SendAsync(request);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    continue;
+                }
+
+                var exhibitorResultRaw = await response.Content.ReadAsStringAsync();
+
+                var exhibitorResult = JsonSerializer.Deserialize<ExhibitorModel>(exhibitorResultRaw);
+
+                if (exhibitorResult == null)
+                {
+                    continue;
+                }
+
+                eventExhibitor.Booth = exhibitorResult.Booth;
+                eventExhibitor.CompanyId = exhibitorResult.CompanyId;
+                eventExhibitor.EventName = exhibitorResult.EventName;
+                eventExhibitor.ExhibitorName = exhibitorResult.ExhibitorName;
+                eventExhibitor.Hall = exhibitorResult.Hall;
+
+                validEventExhibitors.Add(exhibitorResult);
+            }
+
+            var exhibitorsJson = JsonSerializer.Serialize(validEventExhibitors);
 
             await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.Exhibitors, exhibitorsJson);
 
@@ -295,13 +344,13 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             }
 
             var lastSelectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
-            var maybeSelectedExhibitor = eventExhibitorModels.SingleOrDefault(ee => ee.ExhibitorId == lastSelectedExhibitorId);
-            var selectedExhibitor = maybeSelectedExhibitor ?? eventExhibitorModels.First();
+            var maybeSelectedExhibitor = validEventExhibitors.SingleOrDefault(ee => ee.ExhibitorId == lastSelectedExhibitorId);
+            var selectedExhibitor = maybeSelectedExhibitor ?? validEventExhibitors.First();
 
             await _genericAttributeService.SaveAttributeAsync(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId, selectedExhibitor.ExhibitorId);
 
             var allRoles = await _customerService.GetAllCustomerRolesAsync();
-            var roleToAssign = allRoles.SingleOrDefault(r => r.SystemName == selectedExhibitor.Event);
+            var roleToAssign = allRoles.SingleOrDefault(r => r.SystemName == selectedExhibitor.EventId);
             if (roleToAssign is null)
             {
                 return;

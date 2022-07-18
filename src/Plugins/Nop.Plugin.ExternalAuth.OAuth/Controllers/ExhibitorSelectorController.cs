@@ -5,9 +5,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
+using Nop.Core.Domain.Orders;
 using Nop.Plugin.ExternalAuth.OAuth.Models;
 using Nop.Services.Common;
 using Nop.Services.Customers;
+using Nop.Services.Orders;
 using Nop.Web.Framework.Controllers;
 
 namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
@@ -18,16 +20,19 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
         private readonly IGenericAttributeService _genericAttributeService;
         private readonly ICustomerService _customerService;
         private readonly IWorkContext _workContext;
+        private readonly IShoppingCartService _shoppingCartService;
 
         public ExhibitorSelectorController(
             IWorkContext workContext,
             IGenericAttributeService genericAttributeService,
-            ICustomerService customerService
+            ICustomerService customerService,
+            IShoppingCartService shoppingCartService
         )
         {
             _workContext = workContext;
             _genericAttributeService = genericAttributeService;
             _customerService = customerService;
+            _shoppingCartService = shoppingCartService;
         }
 
         [HttpGet]
@@ -38,6 +43,14 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             var selectedExhibitorId = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.SelectedExhibitorId);
             var customerExhibitorsString = await _genericAttributeService.GetAttributeAsync<string>(customer, OAuthAuthenticationDefaults.CustomAttributes.Exhibitors);
             var customerExhibitors = JsonSerializer.Deserialize<ExhibitorModel[]>(customerExhibitorsString);
+
+            var cartItems = await _shoppingCartService.GetShoppingCartAsync(customer, ShoppingCartType.ShoppingCart);
+
+            for (var i = 0; i < cartItems.Count; i++)
+            {
+                var sci = cartItems[i];
+                await _shoppingCartService.DeleteShoppingCartItemAsync(sci);
+            }
 
             var selectedExhibitor = customerExhibitors?.SingleOrDefault(ex => ex.IdEquals(exhibitorId));
 
@@ -55,7 +68,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Controllers
             }
 
             var allRoles = await _customerService.GetAllCustomerRolesAsync();
-            var roleToAssign = allRoles.SingleOrDefault(r => r.SystemName == selectedExhibitor.Event);
+            var roleToAssign = allRoles.SingleOrDefault(r => r.SystemName == selectedExhibitor.EventId);
             if (roleToAssign is null)
             {
                 return Redirect(returnUrl);

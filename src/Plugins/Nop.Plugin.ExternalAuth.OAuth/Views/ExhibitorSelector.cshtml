@@ -11,7 +11,7 @@
   var returnUrl = webHelper.GetRawUrl(Context.Request);
   var selectItems = Model.Exhibitors.Select(ex => new SelectListItem
   {
-    Text = ex.Exhibitor + " @ " + ex.Event,
+    Text = $"{ex.ExhibitorName} ({ex.Hall}.{ex.Booth}) @ {ex.EventName}",
     Value = Url.ActionLink("SelectExhibitor", "ExhibitorSelector", new { exhibitorId = ex.ExhibitorId, returnUrl = returnUrl }),
     Selected = ex.IdEquals(Model.SelectedExhibitorId)
   }).ToList();
