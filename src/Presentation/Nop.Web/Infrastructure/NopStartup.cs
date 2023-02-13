@@ -12,7 +12,7 @@ namespace Nop.Web.Infrastructure
     /// <summary>
     /// Represents the registering services on application startup
     /// </summary>
-    public class NopStartup : INopStartup
+    public partial class NopStartup : INopStartup
     {
         /// <summary>
         /// Add and configure any of the middleware
@@ -105,6 +105,7 @@ namespace Nop.Web.Infrastructure
             services.AddScoped<Factories.IProfileModelFactory, Factories.ProfileModelFactory>();
             services.AddScoped<Factories.IReturnRequestModelFactory, Factories.ReturnRequestModelFactory>();
             services.AddScoped<Factories.IShoppingCartModelFactory, Factories.ShoppingCartModelFactory>();
+            services.AddScoped<Factories.ISitemapModelFactory, Factories.SitemapModelFactory>();
             services.AddScoped<Factories.ITopicModelFactory, Factories.TopicModelFactory>();
             services.AddScoped<Factories.IVendorModelFactory, Factories.VendorModelFactory>();
             services.AddScoped<Factories.IWidgetModelFactory, Factories.WidgetModelFactory>();
@@ -113,7 +114,7 @@ namespace Nop.Web.Infrastructure
             services.AddScoped<ITinyMceHelper, TinyMceHelper>();
         }
 
-        // <summary>
+        /// <summary>
         /// Configure the using of added middleware
         /// </summary>
         /// <param name="application">Builder for configuring an application's request pipeline</param>

@@ -139,7 +139,7 @@ namespace Nop.Services.ScheduleTasks
         /// <summary>
         /// Represents task thread
         /// </summary>
-        protected class TaskThread : IDisposable
+        protected partial class TaskThread : IDisposable
         {
             #region Fields
 
@@ -229,7 +229,7 @@ namespace Nop.Services.ScheduleTasks
                 }
                 finally
                 {
-                    if (!_disposed)
+                    if (!_disposed && _timer != null)
                     {
                         if (RunOnlyOnce)
                             Dispose();

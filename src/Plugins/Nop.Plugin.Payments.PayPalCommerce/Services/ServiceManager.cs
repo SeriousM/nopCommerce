@@ -396,7 +396,8 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
 
                 //prepare purchase unit details
                 var taxTotal = Math.Round((await _orderTotalCalculationService.GetTaxTotalAsync(shoppingCart, false)).taxTotal, 2);
-                var shippingTotal = Math.Round(await _orderTotalCalculationService.GetShoppingCartShippingTotalAsync(shoppingCart) ?? decimal.Zero, 2);
+                var (cartShippingTotal, _, _) = await _orderTotalCalculationService.GetShoppingCartShippingTotalAsync(shoppingCart, false);
+                var shippingTotal = Math.Round(cartShippingTotal ?? decimal.Zero, 2);
                 var (shoppingCartTotal, _, _, _, _, _) = await _orderTotalCalculationService
                     .GetShoppingCartTotalAsync(shoppingCart, usePaymentMethodAdditionalFee: false);
                 var orderTotal = Math.Round(shoppingCartTotal ?? decimal.Zero, 2);
@@ -427,6 +428,12 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                     };
                 }
 
+                PayPalCheckoutSdk.Orders.Money prepareMoney(decimal value) => new()
+                {
+                    CurrencyCode = currency,
+                    Value = value.ToString(PayPalCommerceDefaults.CurrenciesWithoutDecimals.Contains(currency.ToUpperInvariant()) ? "0" : "0.00", CultureInfo.InvariantCulture)
+                };
+
                 //set order items
                 purchaseUnit.Items = await shoppingCart.SelectAwait(async item =>
                 {
@@ -442,7 +449,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                         Quantity = item.Quantity.ToString(),
                         Category = (product.IsDownload ? ItemCategoryType.Digital_goods : ItemCategoryType.Physical_goods)
                             .ToString().ToUpperInvariant(),
-                        UnitAmount = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = itemPrice.ToString("0.00", CultureInfo.InvariantCulture) }
+                        UnitAmount = prepareMoney(itemPrice)
                     };
                 }).ToListAsync();
 
@@ -460,7 +467,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                             Name = CommonHelper.EnsureMaximumLength(attribute.Name, 127),
                             Description = CommonHelper.EnsureMaximumLength($"{attribute.Name} - {attributeValue.Name}", 127),
                             Quantity = 1.ToString(),
-                            UnitAmount = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = attributePrice.ToString("0.00", CultureInfo.InvariantCulture) }
+                            UnitAmount = prepareMoney(attributePrice)
                         });
                     }
                 }
@@ -480,13 +487,13 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 purchaseUnit.AmountWithBreakdown = new AmountWithBreakdown
                 {
                     CurrencyCode = currency,
-                    Value = orderTotal.ToString("0.00", CultureInfo.InvariantCulture),
+                    Value = prepareMoney(orderTotal).Value,
                     AmountBreakdown = new AmountBreakdown
                     {
-                        ItemTotal = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = itemTotal.ToString("0.00", CultureInfo.InvariantCulture) },
-                        TaxTotal = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = taxTotal.ToString("0.00", CultureInfo.InvariantCulture) },
-                        Shipping = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = shippingTotal.ToString("0.00", CultureInfo.InvariantCulture) },
-                        Discount = new PayPalCheckoutSdk.Orders.Money { CurrencyCode = currency, Value = discountTotal.ToString("0.00", CultureInfo.InvariantCulture) }
+                        ItemTotal = prepareMoney(itemTotal),
+                        TaxTotal = prepareMoney(taxTotal),
+                        Shipping = prepareMoney(shippingTotal),
+                        Discount = prepareMoney(discountTotal)
                     }
                 };
 
@@ -584,9 +591,9 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 if (!IsConfigured(settings))
                     throw new NopException("Plugin not configured");
 
-                var request = new AuthorizationsVoidRequest(authorizationId);
+                var request = new VoidRequest(authorizationId);
 
-                return await HandleCheckoutRequestAsync<AuthorizationsVoidRequest, object>(settings, request);
+                return await HandleCheckoutRequestAsync<VoidRequest, PayPalCheckoutSdk.Payments.Authorization>(settings, request);
             });
         }
 
@@ -616,7 +623,7 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                     refundRequest.Amount = new PayPalCheckoutSdk.Payments.Money
                     {
                         CurrencyCode = currency,
-                        Value = amount.Value.ToString("0.00", CultureInfo.InvariantCulture)
+                        Value = amount.Value.ToString(PayPalCommerceDefaults.CurrenciesWithoutDecimals.Contains(currency.ToUpperInvariant()) ? "0" : "0.00", CultureInfo.InvariantCulture)
                     };
                 }
                 var request = new CapturesRefundRequest(captureId).RequestBody(refundRequest);
@@ -785,8 +792,14 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 if (!Guid.TryParse(orderReference, out var orderGuid))
                     throw new NopException($"Could not recognize an order reference '{orderReference}'");
 
-                var order = await _orderService.GetOrderByGuidAsync(orderGuid)
-                    ?? throw new NopException($"Could not find an order {orderGuid}");
+                var order = await _orderService.GetOrderByGuidAsync(orderGuid);
+                if (order is null)
+                {
+                    if (webhookResource is Order)
+                        return true; //the order may not have been created yet, no need to throw an exception in this case
+
+                    throw new NopException($"Could not find an order {orderGuid}");
+                }
 
                 await _orderService.InsertOrderNoteAsync(new Core.Domain.Orders.OrderNote()
                 {
@@ -891,15 +904,26 @@ namespace Nop.Plugin.Payments.PayPalCommerce.Services
                 payPalOrder = webhookResource as Order;
                 switch (payPalOrder?.Status?.ToLowerInvariant())
                 {
-                    case "approved":
-                        if (decimal.TryParse(payPalOrder.PurchaseUnits?.FirstOrDefault()?.AmountWithBreakdown?.Value, out var approvedAmount) && approvedAmount == Math.Round(order.OrderTotal, 2))
+                    case "completed":
+                        if (decimal.TryParse(payPalOrder.PurchaseUnits?.FirstOrDefault()?.AmountWithBreakdown?.Value, out var approvedAmount) &&
+                            approvedAmount == Math.Round(order.OrderTotal, 2))
                         {
-                            //all is ok, so authorize the approved order
-                            if (_orderProcessingService.CanMarkOrderAsAuthorized(order))
+                            //all is ok, so authorize/capture the approved order
+                            if (string.Equals(payPalOrder.CheckoutPaymentIntent, "authorize", StringComparison.InvariantCultureIgnoreCase))
                             {
-                                order.AuthorizationTransactionResult = payPalOrder.Status;
-                                await _orderService.UpdateOrderAsync(order);
-                                await _orderProcessingService.MarkAsAuthorizedAsync(order);
+                                if (_orderProcessingService.CanMarkOrderAsAuthorized(order))
+                                {
+                                    order.AuthorizationTransactionResult = payPalOrder.Status;
+                                    await _orderProcessingService.MarkAsAuthorizedAsync(order);
+                                }
+                            }
+                            if (string.Equals(payPalOrder.CheckoutPaymentIntent, "capture", StringComparison.InvariantCultureIgnoreCase))
+                            {
+                                if (_orderProcessingService.CanMarkOrderAsPaid(order))
+                                {
+                                    order.CaptureTransactionResult = payPalOrder.Status;
+                                    await _orderProcessingService.MarkOrderAsPaidAsync(order);
+                                }
                             }
                         }
                         break;

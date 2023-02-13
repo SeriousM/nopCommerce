@@ -1,5 +1,5 @@
 # create the build instance 
-FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 
 WORKDIR /src                                                                    
 COPY ./src ./
@@ -23,24 +23,22 @@ WORKDIR /src/Plugins/Nop.Plugin.Misc.Sendinblue
 RUN dotnet build Nop.Plugin.Misc.Sendinblue.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Misc.WebApi.Frontend
 RUN dotnet build Nop.Plugin.Misc.WebApi.Frontend.csproj -c Release
+WORKDIR /src/Plugins/Nop.Plugin.Misc.Zettle
+RUN dotnet build Nop.Plugin.Misc.Zettle.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.MultiFactorAuth.GoogleAuthenticator
 RUN dotnet build Nop.Plugin.MultiFactorAuth.GoogleAuthenticator.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Payments.CheckMoneyOrder
 RUN dotnet build Nop.Plugin.Payments.CheckMoneyOrder.csproj -c Release
+WORKDIR /src/Plugins/Nop.Plugin.Payments.CyberSource
+RUN dotnet build Nop.Plugin.Payments.CyberSource.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Payments.Manual
 RUN dotnet build Nop.Plugin.Payments.Manual.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Payments.PayPalCommerce
 RUN dotnet build Nop.Plugin.Payments.PayPalCommerce.csproj -c Release
-WORKDIR /src/Plugins/Nop.Plugin.Payments.PayPalStandard
-RUN dotnet build Nop.Plugin.Payments.PayPalStandard.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Pickup.PickupInStore
 RUN dotnet build Nop.Plugin.Pickup.PickupInStore.csproj -c Release
-WORKDIR /src/Plugins/Nop.Plugin.Shipping.EasyPost
-RUN dotnet build Nop.Plugin.Shipping.EasyPost.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Shipping.FixedByWeightByTotal
 RUN dotnet build Nop.Plugin.Shipping.FixedByWeightByTotal.csproj -c Release
-WORKDIR /src/Plugins/Nop.Plugin.Shipping.ShipStation
-RUN dotnet build Nop.Plugin.Shipping.ShipStation.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Shipping.UPS
 RUN dotnet build Nop.Plugin.Shipping.UPS.csproj -c Release
 WORKDIR /src/Plugins/Nop.Plugin.Tax.Avalara
@@ -62,15 +60,34 @@ RUN dotnet build Nop.Plugin.Widgets.What3words.csproj -c Release
 WORKDIR /src/Presentation/Nop.Web   
 RUN dotnet publish Nop.Web.csproj -c Release -o /app/published
 
+WORKDIR /app/published
+
+RUN mkdir logs
+RUN mkdir bin
+
+RUN chmod 775 App_Data/
+RUN chmod 775 App_Data/DataProtectionKeys
+RUN chmod 775 bin
+RUN chmod 775 logs
+RUN chmod 775 Plugins
+RUN chmod 775 wwwroot/bundles
+RUN chmod 775 wwwroot/db_backups
+RUN chmod 775 wwwroot/files/exportimport
+RUN chmod 775 wwwroot/icons
+RUN chmod 775 wwwroot/images
+RUN chmod 775 wwwroot/images/thumbs
+RUN chmod 775 wwwroot/images/uploaded
+
 # create the runtime instance 
-FROM mcr.microsoft.com/dotnet/aspnet:6.0-alpine AS runtime 
+FROM mcr.microsoft.com/dotnet/aspnet:7.0-alpine AS runtime 
 
 # add globalization support
 RUN apk add --no-cache icu-libs
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 # installs required packages
-RUN apk add libgdiplus --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --allow-untrusted
+RUN apk add tiff --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/main/ --allow-untrusted
+RUN apk add libgdiplus --no-cache --repository http://dl-3.alpinelinux.org/alpine/edge/community/ --allow-untrusted
 RUN apk add libc-dev --no-cache
 RUN apk add tzdata --no-cache
 
@@ -78,10 +95,10 @@ RUN apk add tzdata --no-cache
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod 755 /entrypoint.sh
 
-WORKDIR /app        
-RUN mkdir bin
-RUN mkdir logs 
+WORKDIR /app
 
 COPY --from=build /app/published .
+
+EXPOSE 80
                             
 ENTRYPOINT "/entrypoint.sh"

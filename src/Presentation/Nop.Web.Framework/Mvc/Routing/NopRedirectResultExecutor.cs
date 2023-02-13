@@ -13,7 +13,7 @@ namespace Nop.Web.Framework.Mvc.Routing
     /// <summary>
     /// Represents custom overridden redirect result executor
     /// </summary>
-    public class NopRedirectResultExecutor : RedirectResultExecutor
+    public partial class NopRedirectResultExecutor : RedirectResultExecutor
     {
         #region Fields
 
@@ -63,7 +63,11 @@ namespace Nop.Web.Framework.Mvc.Routing
 
                 var uri = new Uri(isLocalUrl ? $"{_webHelper.GetStoreLocation().TrimEnd('/')}{url}" : url, UriKind.Absolute);
 
-                result.Url = isLocalUrl ? uri.PathAndQuery : $"{uri.GetLeftPart(UriPartial.Query)}{uri.Fragment}";
+                //Allowlist redirect URI schemes to http and https
+                if ((uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && urlHelper.IsLocalUrl(uri.AbsolutePath))
+                    result.Url = isLocalUrl ? uri.PathAndQuery : $"{uri.GetLeftPart(UriPartial.Query)}{uri.Fragment}";
+                else
+                    result.Url = urlHelper.RouteUrl("Homepage");
             }
 
             return base.ExecuteAsync(context, result);

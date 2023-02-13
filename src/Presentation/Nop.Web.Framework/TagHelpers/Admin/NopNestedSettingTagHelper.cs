@@ -12,7 +12,7 @@ namespace Nop.Web.Framework.TagHelpers.Admin
     /// "nop-nested-setting" tag helper
     /// </summary>
     [HtmlTargetElement("nop-nested-setting", Attributes = FOR_ATTRIBUTE_NAME)]
-    public class NopNestedSettingTagHelper : TagHelper
+    public partial class NopNestedSettingTagHelper : TagHelper
     {
         #region Constants
 
@@ -79,6 +79,7 @@ namespace Nop.Web.Framework.TagHelpers.Admin
                 throw new ArgumentNullException(nameof(output));
 
             var parentSettingName = For.Name;
+            var jsConsistentParentSettingName = parentSettingName.Replace('.', '_');
 
             var random = CommonHelper.GenerateRandomInteger();
             var nestedSettingId = $"nestedSetting{random}";
@@ -105,16 +106,16 @@ namespace Nop.Web.Framework.TagHelpers.Admin
 
             if (!DisableAutoGeneration)
                 script.InnerHtml.AppendHtml(
-                    $"$('#{parentSettingName}').click(toggle_{parentSettingName});" +
-                    $"toggle_{parentSettingName}();"
+                    $"$('#{jsConsistentParentSettingName}').click(toggle_{jsConsistentParentSettingName});" +
+                    $"toggle_{jsConsistentParentSettingName}();"
                 );
 
             script.InnerHtml.AppendHtml("});");
 
             if (!DisableAutoGeneration)
                 script.InnerHtml.AppendHtml(
-                    $"function toggle_{parentSettingName}() " + "{" +
-                        $"if ({isNot}$('#{parentSettingName}').is(':checked')) " + "{" +
+                    $"function toggle_{jsConsistentParentSettingName}() " + "{" +
+                        $"if ({isNot}$('#{jsConsistentParentSettingName}').is(':checked')) " + "{" +
                             $"$('#{nestedSettingId}').showElement();" +
                         "} else {" +
                             $"$('#{nestedSettingId}').hideElement();" +

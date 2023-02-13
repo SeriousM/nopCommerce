@@ -7,7 +7,7 @@ namespace Nop.Services.Installation
     /// Represents the implementation of ISO3166-1
     /// </summary>
     /// <remarks>https://en.wikipedia.org/wiki/List_of_ISO_3166_country_codes</remarks>
-    public static class ISO3166
+    public static partial class ISO3166
     {
         /// <summary>
         /// Obtain ISO3166-1 Country based on its ISO code.
@@ -214,7 +214,7 @@ namespace Nop.Services.Installation
                 new ISO3166Country("Niue", "NU", "NIU", 570, new[] { "683" }),
                 new ISO3166Country("Norfolk Island", "NF", "NFK", 574, new[] { "672" }),
                 new ISO3166Country("Northern Mariana Islands", "MP", "MNP", 580, new[] { "1 670" }),
-                new ISO3166Country("Norway", "NO", "NOR", 578, new[] { "47" }, localizationInfo: new[] { new LocalizationInfo("nn-NO", "Norwegian") }),
+                new ISO3166Country("Norway", "NO", "NOR", 578, new[] { "47" }, localizationInfo: new[] { new LocalizationInfo("nb-NO", "Norwegian") }),
                 new ISO3166Country("Oman", "OM", "OMN", 512, new[] { "968" }, localizationInfo: new[] { new LocalizationInfo("ar-OM", "Arabic") }),
                 new ISO3166Country("Pakistan", "PK", "PAK", 586, new[] { "92" }),
                 new ISO3166Country("Palau", "PW", "PLW", 585, new[] { "680" }),
@@ -305,7 +305,7 @@ namespace Nop.Services.Installation
     /// <summary>
     /// Representation of an ISO3166-1 Country
     /// </summary>
-    public class ISO3166Country
+    public partial class ISO3166Country
     {
         public ISO3166Country(string name, string alpha2, string alpha3, int numericCode, string[] dialCodes = null, bool subjectToVat = false, IEnumerable<LocalizationInfo> localizationInfo = null)
         {
@@ -351,7 +351,7 @@ namespace Nop.Services.Installation
         public IEnumerable<LocalizationInfo> LocalizationInfo { get; private set; }
     }
 
-    public class LocalizationInfo
+    public partial class LocalizationInfo
     {
         public LocalizationInfo(string culture, string language)
         {

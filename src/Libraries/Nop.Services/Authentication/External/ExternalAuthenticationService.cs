@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
+using Microsoft.AspNetCore.Mvc.Routing;
 using Nop.Core;
 using Nop.Core.Domain.Customers;
 using Nop.Core.Domain.Localization;
@@ -12,7 +14,6 @@ using Nop.Core.Http.Extensions;
 using Nop.Data;
 using Nop.Services.Common;
 using Nop.Services.Customers;
-using Nop.Services.Html;
 using Nop.Services.Localization;
 using Nop.Services.Messages;
 
@@ -27,6 +28,7 @@ namespace Nop.Services.Authentication.External
 
         private readonly CustomerSettings _customerSettings;
         private readonly ExternalAuthenticationSettings _externalAuthenticationSettings;
+        private readonly IActionContextAccessor _actionContextAccessor;
         private readonly IAuthenticationPluginManager _authenticationPluginManager;
         private readonly ICustomerRegistrationService _customerRegistrationService;
         private readonly ICustomerService _customerService;
@@ -36,6 +38,7 @@ namespace Nop.Services.Authentication.External
         private readonly ILocalizationService _localizationService;
         private readonly IRepository<ExternalAuthenticationRecord> _externalAuthenticationRecordRepository;
         private readonly IStoreContext _storeContext;
+        private readonly IUrlHelperFactory _urlHelperFactory;
         private readonly IWorkContext _workContext;
         private readonly IWorkflowMessageService _workflowMessageService;
         private readonly LocalizationSettings _localizationSettings;
@@ -46,6 +49,7 @@ namespace Nop.Services.Authentication.External
 
         public ExternalAuthenticationService(CustomerSettings customerSettings,
             ExternalAuthenticationSettings externalAuthenticationSettings,
+            IActionContextAccessor actionContextAccessor,
             IAuthenticationPluginManager authenticationPluginManager,
             ICustomerRegistrationService customerRegistrationService,
             ICustomerService customerService,
@@ -55,12 +59,14 @@ namespace Nop.Services.Authentication.External
             ILocalizationService localizationService,
             IRepository<ExternalAuthenticationRecord> externalAuthenticationRecordRepository,
             IStoreContext storeContext,
+            IUrlHelperFactory urlHelperFactory,
             IWorkContext workContext,
             IWorkflowMessageService workflowMessageService,
             LocalizationSettings localizationSettings)
         {
             _customerSettings = customerSettings;
             _externalAuthenticationSettings = externalAuthenticationSettings;
+            _actionContextAccessor = actionContextAccessor;
             _authenticationPluginManager = authenticationPluginManager;
             _customerRegistrationService = customerRegistrationService;
             _customerService = customerService;
@@ -70,6 +76,7 @@ namespace Nop.Services.Authentication.External
             _localizationService = localizationService;
             _externalAuthenticationRecordRepository = externalAuthenticationRecordRepository;
             _storeContext = storeContext;
+            _urlHelperFactory = urlHelperFactory;
             _workContext = workContext;
             _workflowMessageService = workflowMessageService;
             _localizationSettings = localizationSettings;
@@ -177,7 +184,7 @@ namespace Nop.Services.Authentication.External
 
             //store owner notifications
             if (_customerSettings.NotifyNewCustomerRegistration)
-                await _workflowMessageService.SendCustomerRegisteredNotificationMessageAsync(customer, _localizationSettings.DefaultAdminLanguageId);
+                await _workflowMessageService.SendCustomerRegisteredStoreOwnerNotificationMessageAsync(customer, _localizationSettings.DefaultAdminLanguageId);
 
             //associate external account with registered user
             await AssociateExternalAccountWithUserAsync(customer, parameters);
@@ -240,13 +247,15 @@ namespace Nop.Services.Authentication.External
         /// <returns>Result of an authentication</returns>
         protected virtual IActionResult SuccessfulAuthentication(string returnUrl)
         {
+            var urlHelper = _urlHelperFactory.GetUrlHelper(_actionContextAccessor.ActionContext);
+
             //redirect to the return URL if it's specified
-            if (!string.IsNullOrEmpty(returnUrl))
+            if (!string.IsNullOrEmpty(returnUrl) && urlHelper.IsLocalUrl(returnUrl))
                 return new RedirectResult(returnUrl);
 
             return new RedirectToRouteResult("Homepage", null);
         }
-        
+
         #endregion
 
         #region Methods
@@ -285,7 +294,7 @@ namespace Nop.Services.Authentication.External
         }
 
         #endregion
-        
+
         /// <summary>
         /// Get the external authentication records by identifier
         /// </summary>
@@ -329,7 +338,26 @@ namespace Nop.Services.Authentication.External
 
             await _externalAuthenticationRecordRepository.DeleteAsync(externalAuthenticationRecord, false);
         }
-        
+
+        /// <summary>
+        /// Get the external authentication record
+        /// </summary>
+        /// <param name="parameters">External authentication parameters</param>
+        /// <returns>
+        /// A task that represents the asynchronous operation
+        /// The task result contains the result
+        /// </returns>
+        public virtual async Task<ExternalAuthenticationRecord> GetExternalAuthenticationRecordByExternalAuthenticationParametersAsync(ExternalAuthenticationParameters parameters)
+        {
+            if (parameters == null)
+                throw new ArgumentNullException(nameof(parameters));
+
+            var associationRecord = await _externalAuthenticationRecordRepository.Table.FirstOrDefaultAsync(record =>
+                record.ExternalIdentifier.Equals(parameters.ExternalIdentifier) && record.ProviderSystemName.Equals(parameters.ProviderSystemName));
+
+            return associationRecord;
+        }
+
         /// <summary>
         /// Associate external account with customer
         /// </summary>
