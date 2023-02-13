@@ -3,7 +3,7 @@
   "FriendlyName": "OAuth authentication",
   "SystemName": "ExternalAuth.OAuth",
   "Version": "1.0",
-  "SupportedVersions": [ "4.50" ],
+  "SupportedVersions": [ "4.60" ],
   "Author": "adventics GmbH",
   "DisplayOrder": 5,
   "FileName": "Nop.Plugin.ExternalAuth.OAuth.dll",
