@@ -28,6 +28,7 @@ using Nop.Services.Orders;
 using Nop.Services.Payments;
 using Nop.Services.Security;
 using Nop.Services.Shipping;
+using Nop.Services.Stores;
 using Nop.Services.Tax;
 using Nop.Services.Vendors;
 
@@ -74,6 +75,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
                                             IShippingService shippingService,
                                             IShoppingCartService shoppingCartService,
                                             IStateProvinceService stateProvinceService,
+                                            IStoreService storeService,
                                             ITaxService taxService,
                                             IVendorService vendorService,
                                             IWebHelper webHelper,
@@ -119,6 +121,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Services
             shippingService,
             shoppingCartService,
             stateProvinceService,
+            storeService,
             taxService,
             vendorService,
             webHelper,

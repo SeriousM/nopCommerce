@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Nop.Core.Domain.Customers;
 using Nop.Services.Authentication.External;
 using Nop.Services.Common;
+using Nop.Services.Customers;
 using Nop.Services.Events;
 
 namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
@@ -24,15 +25,19 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly IOptionsSnapshot<OpenIdConnectOptions> _openIdConnectOptions;
 
+        private readonly ICustomerService _customerService;
+
         #endregion
 
         #region Ctor
 
         public OAuthAuthenticationEventConsumer(
+          ICustomerService customerService,
           IGenericAttributeService genericAttributeService,
           IHttpContextAccessor httpContextAccessor,
           IOptionsSnapshot<OpenIdConnectOptions> openIdConnectOptions)
         {
+          _customerService = customerService;
           _genericAttributeService = genericAttributeService;
           _httpContextAccessor = httpContextAccessor;
           _openIdConnectOptions = openIdConnectOptions;
@@ -56,14 +61,17 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
             if (!eventMessage.AuthenticationParameters.ProviderSystemName.Equals(OAuthAuthenticationDefaults.SystemName))
                 return;
 
+            var customer = eventMessage.Customer;
             //store some of the customer fields
             var firstName = eventMessage.AuthenticationParameters.Claims?.FirstOrDefault(claim => claim.Type == ClaimTypes.GivenName)?.Value;
             if (!string.IsNullOrEmpty(firstName))
-                await _genericAttributeService.SaveAttributeAsync(eventMessage.Customer, NopCustomerDefaults.FirstNameAttribute, firstName);
+              customer.FirstName = firstName;
 
             var lastName = eventMessage.AuthenticationParameters.Claims?.FirstOrDefault(claim => claim.Type == ClaimTypes.Surname)?.Value;
             if (!string.IsNullOrEmpty(lastName))
-                await _genericAttributeService.SaveAttributeAsync(eventMessage.Customer, NopCustomerDefaults.LastNameAttribute, lastName);
+              customer.LastName = lastName;
+
+            await _customerService.UpdateCustomerAsync(customer);
         }
 
         public async Task HandleEventAsync(CustomerLoggedOutEvent eventMessage)

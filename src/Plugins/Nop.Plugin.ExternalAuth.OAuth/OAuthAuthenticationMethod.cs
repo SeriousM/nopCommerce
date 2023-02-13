@@ -1,6 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Nop.Core;
+using Nop.Plugin.ExternalAuth.OAuth.Components;
 using Nop.Services.Authentication.External;
 using Nop.Services.Cms;
 using Nop.Services.Configuration;
@@ -47,29 +49,19 @@ namespace Nop.Plugin.ExternalAuth.OAuth
         }
 
         /// <summary>
-        /// Gets a name of a view component for displaying plugin in public store
+        /// Gets a type of a view component for displaying plugin in public store
         /// </summary>
-        /// <returns>View component name</returns>
-        public string GetPublicViewComponentName()
+        /// <returns>View component type</returns>
+        public Type GetPublicViewComponent()
         {
-            return OAuthAuthenticationDefaults.VIEW_COMPONENT_NAME;
+            return typeof(OAuthAuthenticationViewComponent);
         }
 
         /// <summary>
         /// Gets a value indicating whether to hide this plugin on the widget list page in the admin area
         /// </summary>
         public bool HideInWidgetList => false;
-
-        /// <summary>
-        /// Gets a name of a view component for displaying widget
-        /// </summary>
-        /// <param name="widgetZone">Name of the widget zone</param>
-        /// <returns>View component name</returns>
-        public string GetWidgetViewComponentName(string widgetZone)
-        {
-            return OAuthAuthenticationDefaults.WIDGET_COMPONENT_NAME;
-        }
-
+        
         /// <summary>
         /// Gets widget zones where this widget should be rendered
         /// </summary>
@@ -77,6 +69,21 @@ namespace Nop.Plugin.ExternalAuth.OAuth
         public Task<IList<string>> GetWidgetZonesAsync()
         {
             return Task.FromResult<IList<string>>(new List<string> { PublicWidgetZones.HeaderSelectors });
+        }
+
+        /// <summary>
+        /// Gets a type of a view component for displaying widget
+        /// </summary>
+        /// <param name="widgetZone">Name of the widget zone</param>
+        /// <returns>View component type</returns>
+        public Type GetWidgetViewComponent(string widgetZone)
+        {
+          if (widgetZone is null)
+            throw new ArgumentNullException(nameof(widgetZone));
+
+            // OAuthAuthenticationDefaults.WIDGET_COMPONENT_NAME
+
+            return typeof(OAuthAuthenticationViewComponent);
         }
 
         /// <summary>
