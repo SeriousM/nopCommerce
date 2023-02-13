@@ -5,9 +5,9 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using Nop.Core.Infrastructure;
-using Nop.Services.Authentication;
 using Nop.Services.Authentication.External;
 
 namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
@@ -23,13 +23,20 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
         /// <param name="builder">Authentication builder</param>
         public void Configure(AuthenticationBuilder builder)
         {
+            var logger = EngineContext.Current.Resolve<ILoggerFactory>().CreateLogger<OAuthAuthenticationRegistrar>();
+            var settings = EngineContext.Current.Resolve<OAuthExternalAuthSettings>();
+            if (settings.AuthorityUrl?.StartsWith("http") != true || string.IsNullOrWhiteSpace(settings.ClientKeyIdentifier))
+            {
+                logger.LogWarning("Skip oauth setup because of missing authority url and/or clientId.");
+                return;
+            }
+
             builder.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
             {
                 //set credentials
-                var settings = EngineContext.Current.Resolve<OAuthExternalAuthSettings>();
                 options.Authority = settings.AuthorityUrl;
                 options.ClientId = settings.ClientKeyIdentifier;
-                
+
                 // default scopes set: openid, profile
                 if (settings.AdditionalScopes is not null)
                 {
@@ -39,7 +46,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
                         options.Scope.Add(scope);
                     }
                 }
-                
+
                 // force using the userinfo endpoint after creating the identity (first time only).
                 //options.GetClaimsFromUserInfoEndpoint
 
@@ -57,7 +64,7 @@ namespace Nop.Plugin.ExternalAuth.OAuth.Infrastructure
 
                 //store access and refresh tokens for the further usage
                 options.SaveTokens = true;
-                
+
                 //set custom events handlers
                 options.Events = new OpenIdConnectEvents
                 {
